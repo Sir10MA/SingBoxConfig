@@ -1,9 +1,10 @@
-name: Build Universal APK (p4a)
+name: Build Universal APK
 
 on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   build:
@@ -14,53 +15,62 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # Step 2: Install dependencies
+      # Step 2: Install system dependencies
       - name: Install system dependencies
         run: |
           sudo apt update
           sudo apt install -y \
             python3 python3-pip python3-setuptools git zip unzip openjdk-17-jdk \
-            libffi-dev libssl-dev libjpeg-dev zlib1g-dev
+            libffi-dev libssl-dev libjpeg-dev zlib1g-dev \
+            autoconf automake libtool pkg-config
 
       # Step 3: Install python-for-android
       - name: Install python-for-android
         run: |
           pip install --upgrade pip
-          pip install python-for-android cython
+          pip install python-for-android
 
-      # Step 4: Setup Android SDK + NDK
-      - name: Setup Android SDK and NDK
+      # Step 4: Setup Android SDK & NDK
+      - name: Setup Android SDK & NDK
         run: |
           mkdir -p $HOME/android-sdk
-          wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O sdk-tools.zip
-          unzip sdk-tools.zip -d $HOME/android-sdk/cmdline-tools
-          mv $HOME/android-sdk/cmdline-tools/cmdline-tools $HOME/android-sdk/cmdline-tools/latest
-          export ANDROIDSDK=$HOME/android-sdk
-          export PATH=$PATH:$ANDROIDSDK/cmdline-tools/latest/bin:$ANDROIDSDK/platform-tools
-          yes | sdkmanager --sdk_root=$ANDROIDSDK "platform-tools" "platforms;android-33" "build-tools;33.0.2" "ndk;25.2.9519653"
-          echo "ANDROIDSDK=$ANDROIDSDK" >> $GITHUB_ENV
-          echo "ANDROIDNDK=$ANDROIDSDK/ndk/25.2.9519653" >> $GITHUB_ENV
-          echo "PATH=$PATH" >> $GITHUB_ENV
+          wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
+          unzip cmdline-tools.zip -d $HOME/android-sdk/
+          mkdir -p $HOME/android-sdk/cmdline-tools/latest
+          mv $HOME/android-sdk/cmdline-tools/bin $HOME/android-sdk/cmdline-tools/latest/
+          export ANDROID_HOME=$HOME/android-sdk
+          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
+          yes | sdkmanager --sdk_root=$ANDROID_HOME "platform-tools" "platforms;android-33" "build-tools;33.0.2" "ndk;25.2.9519653"
 
-      # Step 5: Build Universal APK
+      # Step 5: Patch autotools for libffi
+      - name: Patch autotools
+        run: |
+          autoreconf --install --force || true
+
+      # Step 6: Build Universal APK with p4a
       - name: Build APK
         run: |
-          source $GITHUB_ENV
+          export ANDROID_HOME=$HOME/android-sdk
+          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
           p4a apk \
             --private . \
             --package=org.singbox.generator \
             --name "SingBox Generator" \
             --version 0.1 \
-            --bootstrap sdl2 \
-            --requirements=python3,kivy,kivymd,requests \
-            --sdk-dir $ANDROIDSDK \
-            --ndk-dir $ANDROIDNDK \
+            --bootstrap=sdl2 \
+            --requirements=python3,kivy,kivymd \
             --arch=armeabi-v7a \
-            --arch=arm64-v8a
+            --arch=arm64-v8a \
+            --arch=x86 \
+            --arch=x86_64 \
+            --sdk_dir=$ANDROID_HOME \
+            --ndk_dir=$ANDROID_HOME/ndk/25.2.9519653 \
+            --android_api=33 \
+            --output-filename singbox-universal.apk
 
-      # Step 6: Upload APK
+      # Step 7: Upload APK as artifact
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: SingBoxGenerator-Universal
-          path: dist/*.apk
+          name: SingBox-Universal-APK
+          path: singbox-universal.apk
