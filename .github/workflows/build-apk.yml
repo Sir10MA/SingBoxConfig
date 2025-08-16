@@ -1,5 +1,5 @@
 # GitHub Actions workflow to build a KivyMD Python app into an Android APK
-# Version 4: Updated the SDK setup action to resolve the download error.
+# Version 5: Manually installs the Android SDK to bypass action resolution errors.
 
 name: Build Android APK
 
@@ -30,17 +30,30 @@ jobs:
         with:
           python-version: 3.9
 
-      # 4. [FIXED] Set up Android SDK
-      # Updated the action to the latest stable version (v3) to fix the resolving error.
-      - name: Set up Android SDK
-        uses: android-actions/setup-sdk@v3
-        with:
-          # API level of the platform to install
-          api-level: 33
-          # Version of the build tools to install
-          build-tools: 33.0.2
-          # NDK version to install
-          ndk: 25.2.9519653
+      # 4. [NEW] Manually Install Android SDK
+      # This block replaces the failing 'android-actions/setup-sdk' action.
+      # It downloads the command-line tools and uses them to install the required packages.
+      - name: Install Android SDK
+        run: |
+          # Set SDK root path and add it to the environment for subsequent steps
+          SDK_ROOT=${HOME}/android-sdk
+          echo "ANDROID_SDK_ROOT=${SDK_ROOT}" >> $GITHUB_ENV
+          
+          # Download and unzip the Android command-line tools
+          mkdir -p ${SDK_ROOT}
+          wget --quiet https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
+          unzip -q cmdline-tools.zip -d ${SDK_ROOT}/cmdline-tools
+          mv ${SDK_ROOT}/cmdline-tools/cmdline-tools ${SDK_ROOT}/cmdline-tools/latest
+          rm cmdline-tools.zip
+          
+          # Add the SDK tools to the system PATH
+          echo "${SDK_ROOT}/cmdline-tools/latest/bin" >> $GITHUB_PATH
+          echo "${SDK_ROOT}/platform-tools" >> $GITHUB_PATH
+          
+          # Use sdkmanager to install the required platform, build-tools, and platform-tools
+          # The 'yes' command automatically accepts the licenses
+          yes | sdkmanager --licenses > /dev/null
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
 
       # 5. Install Python and system dependencies
       - name: Install dependencies
@@ -61,7 +74,7 @@ jobs:
           package.domain = org.example
           source.dir = .
           source.include_exts = py,png,jpg,kv,atlas,json
-          version = 0.3
+          version = 0.4
           requirements = python3,kivy,kivymd,requests,pysocks
           orientation = portrait
           icon.filename = %(source.dir)s/icon.png
@@ -73,12 +86,9 @@ jobs:
           [android]
           fullscreen = 0
           android.permissions = INTERNET, ACCESS_NETWORK_STATE
-          
           android.api = 33
           android.minapi = 21
-          # This NDK version should match what is installed by the setup-sdk action
-          android.ndk = 25b 
-          
+          android.ndk = 25b
           android.archs = arm64-v8a, armeabi-v7a
           EOF
 
