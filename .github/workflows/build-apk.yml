@@ -1,95 +1,67 @@
-name: Build Android APK (SingBox Generator)
+name: Build Universal APK with Python-for-Android
 
+# This workflow runs on pushes to the 'main' branch or can be triggered manually.
 on:
-  workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
-  build:
+  build-android-p4a:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Set up Java (for Android SDK)
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: 17
+          distribution: 'temurin'
+          java-version: '17'
 
-      - name: Cache Android SDK/NDK
-        uses: actions/cache@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          path: |
-            ~/android-sdk
-          key: android-sdk-${{ runner.os }}-33
-          restore-keys: |
-            android-sdk-${{ runner.os }}
+          python-version: '3.9'
 
-      - name: Cache p4a & pip
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/pip
-            ~/.local/share/python-for-android
-            .p4a
-          key: p4a-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
-          restore-keys: |
-            p4a-${{ runner.os }}
-
-      - name: Install dependencies
+      - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            git zip unzip wget curl build-essential \
-            libncurses5 libstdc++6 python3 python3-pip \
-            openjdk-17-jdk zlib1g zlib1g-dev \
-            libffi-dev libssl-dev autoconf automake libtool
+          sudo apt-get install -y git zip unzip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev
 
-      - name: Install p4a
+      - name: Install Python dependencies (p4a, Cython)
         run: |
-          pip install --upgrade pip setuptools wheel
-          pip install git+https://github.com/kivy/python-for-android.git
+          pip install --upgrade cython
+          pip install --upgrade python-for-android
 
-      - name: Setup Android SDK & NDK
+      - name: Build universal unsigned APK with p4a
         run: |
-          export ANDROID_HOME=$HOME/android-sdk
-          export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
-          mkdir -p $ANDROID_HOME/cmdline-tools
-          if [ ! -d "$ANDROID_HOME/cmdline-tools/latest" ]; then
-            wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline-tools.zip
-            unzip -q cmdline-tools.zip -d $ANDROID_HOME/cmdline-tools
-            mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest
-          fi
-          yes | sdkmanager --licenses || true
-          sdkmanager "platforms;android-33" "platform-tools" "build-tools;33.0.2" "ndk;25.2.9519653"
-
-      - name: Build APK
-        run: |
-          export ANDROID_HOME=$HOME/android-sdk
           p4a apk \
-            --private . \
-            --package=org.singbox.generator \
-            --name "SingBox Generator" \
-            --version 0.1 \
+            --universal \
+            --unsigned \
+            --requirements=python3,kivy,requests,pyyaml \
+            --private=. \
+            --package=com.yourdomain.singboxconfig \
+            --name="Sing-box Config Maker" \
+            --version=1.0 \
             --bootstrap=sdl2 \
-            --requirements=python3,kivy,kivymd \
-            --arch=armeabi-v7a \
-            --arch=arm64-v8a \
-            --arch=x86 \
-            --arch=x86_64 \
-            --sdk_dir=$ANDROID_HOME \
-            --ndk_dir=$ANDROID_HOME/ndk/25.2.9519653 \
-            --android_api=33 \
-            --use-setup-py \
-            --recipes=libffi,openssl,sqlite3 \
-            --output-filename singbox-universal.apk
+            --permission=INTERNET \
+            --permission=WRITE_EXTERNAL_STORAGE \
+            --permission=READ_EXTERNAL_STORAGE \
+            --entrypoint=TheBest_fixed_plus4.py \
+            --android-api=33 \
+            --ndk-version=25b \
+            --release \
+            --dist-name=singbox_dist
 
-      - name: Upload APK artifact
+      - name: Find and rename APK
+        run: |
+          # The output file name is dynamic, so we find it and give it a static name.
+          find dist -name "*-release-unsigned.apk" -exec mv {} singbox-config-maker-universal.apk \;
+
+      - name: Upload Unsigned APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: singbox-universal
-          path: singbox-universal.apk
+          name: singbox-config-maker-universal-apk
+          path: singbox-config-maker-universal.apk
