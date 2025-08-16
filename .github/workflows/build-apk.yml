@@ -1,77 +1,58 @@
 # GitHub Actions workflow to build a KivyMD Python app into an Android APK
+# Version 3: Uses a dedicated action to pre-install the Android SDK for reliability.
 
 name: Build Android APK
 
-# Controls when the workflow will run
 on:
-  # Triggers the workflow on push events but only for the "main" branch
   push:
     branches: [ "main" ]
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
 jobs:
   build-android:
-    runs-on: ubuntu-latest # Use the latest Ubuntu runner
+    runs-on: ubuntu-latest
 
     steps:
       # 1. Checkout the repository code
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2. Set up Java Development Kit (JDK)
-      # Buildozer requires a specific JDK version to build for Android
+      # 2. Set up Java Development Kit (JDK) 11
       - name: Set up JDK 11
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '11'
 
-      # 3. Set up Python
+      # 3. Set up Python 3.9
       - name: Set up Python 3.9
         uses: actions/setup-python@v4
         with:
           python-version: 3.9
 
-      # 4. Install system dependencies for Buildozer
-      # These are required for the Android SDK/NDK and other build tools
-      - name: Install Buildozer system dependencies
+      # 4. [NEW] Set up Android SDK
+      # This is the key fix. We pre-install the SDK and build-tools so that
+      # executables like 'aidl' are guaranteed to be in the system PATH.
+      - name: Set up Android SDK
+        uses: android-actions/setup-sdk@v2.2.1
+        with:
+          # API level of the platform to install
+          api-level: 33
+          # Version of the build tools to install
+          build-tools-version: 33.0.2
+          # NDK version to install
+          ndk-version: 25.1.8937393
+
+      # 5. Install Python and system dependencies
+      - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-              python3-pip \
-              build-essential \
-              git \
-              zip \
-              unzip \
-              pkg-config \
-              libgl1-mesa-dev \
-              libgstreamer1.0-dev \
-              libgstreamer-plugins-base1.0-dev \
-              libmtdev-dev \
-              libsdl2-dev \
-              libsdl2-image-dev \
-              libsdl2-mixer-dev \
-              libsdl2-ttf-dev \
-              libfreetype6-dev \
-              libffi-dev \
-              libssl-dev \
-              ccache \
-              autoconf \
-              libtool \
-              libltdl-dev \
-              cmake
-
-      # 5. Install Python dependencies (Cython and Buildozer)
-      - name: Install Python dependencies
-        run: |
+          sudo apt-get install -y ccache autoconf libtool pkg-config
           python -m pip install --upgrade pip
-          pip install "cython<3.0" # Cython < 3.0 is often more compatible
+          pip install "cython<3.0"
           pip install buildozer
 
       # 6. Create the buildozer.spec file
-      # This file configures the entire build process, including app name,
-      # requirements, permissions, and Android versions.
       - name: Create buildozer.spec
         run: |
           cat > buildozer.spec << EOF
@@ -81,7 +62,7 @@ jobs:
           package.domain = org.example
           source.dir = .
           source.include_exts = py,png,jpg,kv,atlas,json
-          version = 0.1
+          version = 0.2
           requirements = python3,kivy,kivymd,requests,pysocks
           orientation = portrait
           icon.filename = %(source.dir)s/icon.png
@@ -92,36 +73,27 @@ jobs:
           
           [android]
           fullscreen = 0
-          # Permissions your app needs
           android.permissions = INTERNET, ACCESS_NETWORK_STATE
           
-          # Target Android API level (updated)
+          # We don't need to specify build_tools here anymore
+          # because the SDK is pre-installed in the step above.
           android.api = 33
           android.minapi = 21
+          android.ndk = 25b # Buildozer uses this to find the pre-installed NDK
           
-          # Android NDK and Build Tools versions (updated for stability)
-          android.ndk = 25b
-          android.build_tools = 33.0.0
-          
-          # Architectures to build for
           android.archs = arm64-v8a, armeabi-v7a
           EOF
 
-      # 7. Auto-accept Android SDK licenses
-      # This prevents the build from hanging in a non-interactive CI environment
-      - name: Accept SDK licenses
-        run: |
-          mkdir -p "$ANDROID_SDK_ROOT/licenses"
-          echo "24333f8a63b6825ea9c5514f83c2729f0048ff42" > "$ANDROID_SDK_ROOT/licenses/android-sdk-license"
-          echo "84831b9409646a918e30573bab4c9c91346d8abd" > "$ANDROID_SDK_ROOT/licenses/android-sdk-preview-license"
+      # 7. [NEW] Clean previous buildozer artifacts
+      # This ensures a completely fresh build without any cached errors.
+      - name: Clean buildozer cache
+        run: buildozer appclean
 
       # 8. Run the Buildozer build command
-      # This step downloads the Android SDK/NDK and compiles the APK
       - name: Build with Buildozer
         run: buildozer -v android debug
 
       # 9. Upload the generated APK as a build artifact
-      # This makes the APK file available for download from the workflow's summary page.
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
