@@ -95,24 +95,32 @@ jobs:
           # Permissions your app needs
           android.permissions = INTERNET, ACCESS_NETWORK_STATE
           
-          # Target Android API level
-          android.api = 31
+          # Target Android API level (updated)
+          android.api = 33
           android.minapi = 21
           
-          # Android SDK and NDK versions to use
-          android.sdk = 24
+          # Android NDK and Build Tools versions (updated for stability)
           android.ndk = 25b
+          android.build_tools = 33.0.0
           
           # Architectures to build for
           android.archs = arm64-v8a, armeabi-v7a
           EOF
 
-      # 7. Run the Buildozer build command
+      # 7. Auto-accept Android SDK licenses
+      # This prevents the build from hanging in a non-interactive CI environment
+      - name: Accept SDK licenses
+        run: |
+          mkdir -p "$ANDROID_SDK_ROOT/licenses"
+          echo "24333f8a63b6825ea9c5514f83c2729f0048ff42" > "$ANDROID_SDK_ROOT/licenses/android-sdk-license"
+          echo "84831b9409646a918e30573bab4c9c91346d8abd" > "$ANDROID_SDK_ROOT/licenses/android-sdk-preview-license"
+
+      # 8. Run the Buildozer build command
       # This step downloads the Android SDK/NDK and compiles the APK
       - name: Build with Buildozer
         run: buildozer -v android debug
 
-      # 8. Upload the generated APK as a build artifact
+      # 9. Upload the generated APK as a build artifact
       # This makes the APK file available for download from the workflow's summary page.
       - name: Upload APK
         uses: actions/upload-artifact@v4
