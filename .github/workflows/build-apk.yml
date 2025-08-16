@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:  # allow manual trigger
 
 jobs:
   build:
@@ -20,21 +21,21 @@ jobs:
           sudo apt update
           sudo apt install -y \
             python3-pip python3-setuptools python3-wheel \
-            python3-dev git zip unzip zlib1g-dev openjdk-17-jdk wget libncurses5
+            python3-dev git zip unzip zlib1g-dev openjdk-17-jdk wget \
+            libncurses5-dev libffi-dev libssl-dev
 
-      # Step 3: Setup Android SDK + NDK
+      # Step 3: Setup Android SDK & Build Tools
       - name: Setup Android SDK
         run: |
+          mkdir -p $HOME/android-sdk/cmdline-tools
+          wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
+          unzip cmdline-tools.zip -d $HOME/android-sdk/cmdline-tools
+          mv $HOME/android-sdk/cmdline-tools/cmdline-tools $HOME/android-sdk/cmdline-tools/latest
           export ANDROID_HOME=$HOME/android-sdk
-          export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
-          mkdir -p $ANDROID_HOME/cmdline-tools
-          wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O sdk.zip
-          unzip sdk.zip -d $ANDROID_HOME/cmdline-tools
-          mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest
-          
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --sdk_root=$ANDROID_HOME "platform-tools" "platforms;android-33" "build-tools;33.0.2" "cmdline-tools;latest" "ndk;25.2.9519653"
+          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
+          yes | sdkmanager --sdk_root=$ANDROID_HOME "platform-tools" "platforms;android-33" "build-tools;33.0.2"
 
-      # Step 4: Install Buildozer
+      # Step 4: Install Buildozer & Cython
       - name: Install Buildozer
         run: |
           pip install --upgrade pip
@@ -49,18 +50,14 @@ jobs:
 
       # Step 6: Build unsigned APK
       - name: Build unsigned APK
-        env:
-          ANDROIDSDK: $HOME/android-sdk
-          ANDROIDNDK: $HOME/android-sdk/ndk/25.2.9519653
-          ANDROIDAPI: 33
-          ANDROIDNDKVER: 25b
         run: |
-          export PATH=$ANDROIDSDK/cmdline-tools/latest/bin:$ANDROIDSDK/platform-tools:$PATH
+          export ANDROID_HOME=$HOME/android-sdk
+          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
           buildozer -v android debug
 
-      # Step 7: Upload APK
+      # Step 7: Upload APK as artifact
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: SingBoxGenerator-unsigned-apk
+          name: SingBoxConfig-unsigned-apk
           path: bin/*.apk
