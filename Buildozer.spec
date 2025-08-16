@@ -1,49 +1,33 @@
 [app]
-title = SingBox Generator
-package.name = singboxgenerator
-package.domain = org.singbox.generator
+title = SingBoxConfig
+package.name = singboxconfig
+package.domain = org.singbox.config
 source.dir = .
-source.include_exts = py,png,jpg,kv,atlas,ttf,xml,json,txt,md
-version = 1.0.0
-requirements = python3,kivy,kivymd,urllib3,requests,certifi,idna,chardet,charset-normalizer
+source.include_exts = py,png,jpg,kv,atlas
+version = 0.1
+requirements = python3,kivy,kivymd
 orientation = portrait
 fullscreen = 0
 
-# Icon (optional, replace with your PNG path)
-icon.filename = %(source.dir)s/icon.png
-
-# Entry point
-entrypoint = main.py
-
-# Logcat filter
-log_level = 2
-
-# Permissions
-android.permissions = INTERNET
-
-# Universal APK
-android.archs = armeabi-v7a,arm64-v8a
-
-# Hide the title bar
-android.hide_titlebar = 0
-
-# API + SDK versions
+# Universal APK (works on arm64-v8a, armeabi-v7a, x86, x86_64)
+android.archs = armeabi-v7a,arm64-v8a,x86,x86_64
 android.api = 33
 android.minapi = 21
 android.sdk = 33
 android.ndk = 25b
 android.ndk_api = 21
+# Force Buildozer to use the SDK installed by the GitHub workflow
+android.sdk_path = $HOME/android-sdk
+android.ndk_path = $HOME/android-sdk/ndk/25.1.8937393
 
-# Packaging options
-package.version = 1.0
-package.version.code = 1
+# Build tools version (matches GitHub Actions workflow)
+android.build_tools_version = 33.0.2
 
-# Buildozer target
-target = android
+# Permissions (add more if Singbox needs network)
+android.permissions = INTERNET
 
-# Copy extra files if needed
-# (uncomment if you want assets/fonts/configs to be bundled)
-# source.include_patterns = assets/*,fonts/*,config/*
+# (Optional) enable logcat
+log_level = 2
 
 [buildozer]
 log_level = 2
