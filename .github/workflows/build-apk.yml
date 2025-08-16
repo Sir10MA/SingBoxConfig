@@ -1,4 +1,4 @@
-name: Build SingBoxConfig APK
+name: Build Unsigned APK
 
 on:
   push:
@@ -18,7 +18,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y python3-pip python3-dev git zip unzip openjdk-17 zlib1g-dev
+          sudo apt install -y python3-pip python3-dev git zip unzip zlib1g-dev default-jdk
 
       # Step 3: Install Buildozer & Cython
       - name: Install Buildozer
@@ -26,15 +26,15 @@ jobs:
           pip install --upgrade pip
           pip install cython buildozer
 
-      # Step 4: Initialize Buildozer if needed
+      # Step 4: Ensure buildozer.spec exists
       - name: Ensure buildozer.spec exists
         run: |
           if [ ! -f buildozer.spec ]; then
             buildozer init
           fi
 
-      # Step 5: Build APK (debug)
-      - name: Build APK
+      # Step 5: Build debug/unsigned APK
+      - name: Build unsigned APK
         run: |
           buildozer -v android debug
 
@@ -42,5 +42,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: SingBoxConfig-debug-apk
+          name: SingBoxConfig-unsigned-apk
           path: bin/*.apk
