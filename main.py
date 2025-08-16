@@ -1,9 +1,11 @@
-# sing_box_config_generator_final_v21.py
+# sing_box_config_generator_final_v26.py
 """
 Sing-box Config Maker - KivyMD Edition (Final Patched Version)
 
-- [UI FIX] Removed the "OLED" theme option to resolve the AttributeError crash on older KivyMD versions.
-- [STABILITY] All other features, including the Maroon theme, robust proxy checker, and navigation fixes, are retained.
+- [UI FIX] Set proxy list cards to an adaptive height to prevent long Geo-IP info from being cut off.
+- [FIX] Changed WireGuard checker to a fast DNS lookup.
+- [FIX] Added a fallback Geo-IP service (ipinfo.io) for the SOCKS5 checker.
+- [FIX] Disabled the main action bar on Settings/Log tabs.
 """
 
 import os
@@ -23,6 +25,7 @@ import webbrowser
 try:
     import requests
     import socks
+    import urllib3 # Explicitly import to help packaging tools
     DEPENDENCIES_AVAILABLE = True
 except ImportError:
     DEPENDENCIES_AVAILABLE = False
@@ -213,7 +216,8 @@ class ProxyDetailWidget(MDCard):
         self.proxy.ui_widget = self
         self.orientation = 'vertical'
         self.size_hint_y = None
-        self.height = "140dp"
+        # [UI FIX] Make card height adaptive to fit all content
+        self.adaptive_height = True
         self.padding = "8dp"
         self.elevation = 3
         self.style = "filled"
@@ -245,7 +249,8 @@ class ProxyDetailWidget(MDCard):
         self.lbl_latency = MDLabel(font_style="Caption", adaptive_height=True)
         
         status_grid.add_widget(MDLabel(text="Info:", font_style="Caption", bold=True, adaptive_height=True))
-        self.lbl_info = MDLabel(font_style="Caption", adaptive_height=True, shorten=True, shorten_from='left')
+        # [UI FIX] Allow info label to wrap instead of shortening
+        self.lbl_info = MDLabel(font_style="Caption", adaptive_height=True)
 
         status_grid.add_widget(self.lbl_status)
         status_grid.add_widget(self.lbl_latency)
@@ -331,7 +336,8 @@ class MainScreen(MDScreen):
         settings_content = MDBoxLayout(orientation="vertical", spacing="15dp", padding="20dp")
         dns_row = MDBoxLayout(adaptive_height=True, spacing="10dp"); dns_row.add_widget(MDLabel(text="DNS Protection", adaptive_height=True, halign="left"))
         self.dns_switch = MDCheckbox(active=self.dns_protection_on, size_hint_x=None, width="48dp"); self.dns_switch.bind(active=self.toggle_dns)
-        dns_row.add_widget(self.dns_switch); settings_content.add_widget(dns_row)
+        dns_row.add_widget(self.dns_switch)
+        settings_content.add_widget(dns_row)
         
         theme_row = MDBoxLayout(adaptive_height=True, spacing="10dp"); theme_row.add_widget(MDLabel(text="App Theme", adaptive_height=True, halign="left"))
         self.theme_button = MDRaisedButton(text="Theme: Dark", on_press=self.open_theme_menu)
@@ -367,8 +373,12 @@ class MainScreen(MDScreen):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         log_entry = f"[{timestamp}] {message}\n"
         print(log_entry.strip())
+        Clock.schedule_once(lambda dt: self._update_log_text(log_entry))
+
+    def _update_log_text(self, log_entry):
         self.log_output.text += log_entry
         self.log_output.cursor = (0, len(self.log_output.text))
+
 
     def post_build_init(self, dt):
         self.set_proxy_type("WireGuard")
@@ -431,9 +441,11 @@ class MainScreen(MDScreen):
         if tab_text in ["Settings", "Log"]:
             self.action_bar.height = 0
             self.action_bar.opacity = 0
+            self.action_bar.disabled = True
         else:
-            self.action_bar.height = "68dp" # Approximate default height
+            self.action_bar.height = "68dp"
             self.action_bar.opacity = 1
+            self.action_bar.disabled = False
 
     def on_detect_and_parse(self, instance):
         txt = (self.paste_input.text or "").strip()
@@ -594,13 +606,20 @@ class MainScreen(MDScreen):
         app = MDApp.get_running_app()
         ptype = proxy.ptype.lower()
         d = proxy.data
-        host, port, user, pw = None, None, None, None
+        host, port = None, None
         
-        Clock.schedule_once(lambda dt: app.root.log_message(f"Checking proxy: {proxy.label} ({proxy.ptype})"))
+        if not DEPENDENCIES_AVAILABLE:
+            proxy.status = "Error"
+            proxy.info = "requests/socks module missing in APK"
+            if proxy.ui_widget: Clock.schedule_once(lambda dt: proxy.ui_widget.update_ui())
+            self.log_message(f"Check failed for {proxy.label}: Dependency missing.")
+            return
+
+        self.log_message(f"Checking proxy: {proxy.label} ({proxy.ptype})")
 
         try:
             if ptype in ('socks5', 'http', 'wireguard'):
-                host, port, user, pw = d.get('server'), d.get('server_port'), d.get('username'), d.get('password')
+                host, port = d.get('server'), d.get('server_port')
             elif ptype in ('vmess', 'vless', 'shadowsocks'):
                 decoded = {
                     'vmess': _decode_vmess, 'vless': _decode_vless, 'shadowsocks': _decode_shadowsocks
@@ -610,79 +629,79 @@ class MainScreen(MDScreen):
             if not host or not port:
                 raise Exception("Invalid Host/Port in config")
 
-            if ptype == 'wireguard':
-                if not DEPENDENCIES_AVAILABLE:
-                    raise Exception("requests module needed for WG check")
-                
-                Clock.schedule_once(lambda dt: app.root.log_message(f"-> Resolving endpoint {host} for WireGuard..."))
+            if ptype in ('socks5', 'http'):
+                self.log_message(f"-> Performing Geo-IP check for {host}:{port}...")
                 try:
+                    proxy_url = f"{'socks5h' if ptype == 'socks5' else 'http'}://"
+                    if d.get("username") and d.get("password"): 
+                        proxy_url += f"{d.get('username')}:{d.get('password')}@"
+                    proxy_url += f"{host}:{port}"
+                    proxies = {"http": proxy_url, "https": proxy_url}
+                    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
+                    
                     start_time = time.time()
+                    api_url = "https://ip-api.com/json/?fields=status,message,country,regionName,query"
+                    response = requests.get(api_url, proxies=proxies, headers=headers, timeout=15, verify=False)
+                    latency_ms = (time.time() - start_time) * 1000
+                    response.raise_for_status()
+                    api_data = response.json()
+
+                    if api_data.get("status") != "success": raise Exception("API 1 Error")
+                    
+                    proxy.info = f"{api_data.get('country', 'N/A')}, {api_data.get('regionName', 'N/A')} - {api_data.get('query', 'N/A')}"
+                    proxy.status = "Reachable"
+                    proxy.latency = f"{latency_ms:.0f}ms"
+                    self.log_message(f"-> Geo-IP Success (API 1) for {proxy.label}: {proxy.info}")
+
+                except Exception as e1:
+                    self.log_message(f"-> API 1 failed: {e1}. Trying fallback...")
+                    try:
+                        start_time = time.time()
+                        api_url = "https://ipinfo.io/json"
+                        response = requests.get(api_url, proxies=proxies, headers=headers, timeout=15, verify=False)
+                        latency_ms = (time.time() - start_time) * 1000
+                        response.raise_for_status()
+                        api_data = response.json()
+                        proxy.info = f"{api_data.get('country', 'N/A')}, {api_data.get('region', 'N/A')} - {api_data.get('ip', 'N/A')}"
+                        proxy.status = "Reachable"
+                        proxy.latency = f"{latency_ms:.0f}ms"
+                        self.log_message(f"-> Geo-IP Success (API 2) for {proxy.label}: {proxy.info}")
+                    except Exception as e2:
+                        self.log_message(f"-> All Geo-IP checks failed for {proxy.label}: {e2}. Falling back to TCP ping.")
+                        latency_ms, resolved_ip = _tcp_ping_host(host, int(port))
+                        if latency_ms == float('inf'): raise Exception(resolved_ip)
+                        proxy.status = "Reachable"
+                        proxy.latency = f"{latency_ms:.0f}ms"
+                        proxy.info = f"Resolved IP: {resolved_ip}"
+            
+            elif ptype == 'wireguard':
+                self.log_message(f"-> Resolving DNS for WireGuard endpoint {host}...")
+                start_time = time.time()
+                try:
                     resolved_ip = socket.gethostbyname(host)
                     latency_ms = (time.time() - start_time) * 1000
                     proxy.status = "Reachable"
-                    proxy.latency = f"{latency_ms:.0f}ms (Resolve)"
+                    proxy.latency = f"{latency_ms:.0f}ms (DNS)"
                     proxy.info = f"Endpoint IP: {resolved_ip}"
-                    Clock.schedule_once(lambda dt: app.root.log_message(f"-> Success for {proxy.label}. Endpoint resolved."))
-                    
-                    Clock.schedule_once(lambda dt: app.root.log_message(f"-> Performing Geo-IP lookup for WireGuard IP {resolved_ip}..."))
-                    try:
-                        response = requests.get(f"https://ip-api.com/json/{resolved_ip}?fields=status,message,country,regionName", timeout=10)
-                        response.raise_for_status()
-                        geo_data = response.json()
-                        if geo_data.get("status") == "success":
-                            proxy.info = f"{geo_data.get('country', 'N/A')}, {geo_data.get('regionName', 'N/A')} - {resolved_ip}"
-                            Clock.schedule_once(lambda dt: app.root.log_message(f"-> Geo-IP for WG Success: {proxy.info}"))
-                    except Exception as e:
-                        Clock.schedule_once(lambda dt, exc=e: app.root.log_message(f"-> Geo-IP for WG failed: {exc}"))
-
+                    self.log_message(f"-> DNS Success for {proxy.label}: {proxy.info}")
                 except socket.gaierror:
                     raise Exception("Host Not Found")
-            
-            elif ptype in ('socks5', 'http') and DEPENDENCIES_AVAILABLE:
-                Clock.schedule_once(lambda dt: app.root.log_message(f"-> Performing Geo-IP check for {host}:{port}..."))
-                proxy_url = f"{'socks5h' if ptype == 'socks5' else 'http'}://"
-                if user and pw: proxy_url += f"{user}:{pw}@"
-                proxy_url += f"{host}:{port}"
-                proxies = {"http": proxy_url, "https": proxy_url}
-                
-                try:
-                    start_time = time.time()
-                    api_url = "https://ip-api.com/json/?fields=status,message,country,regionName,query"
-                    response = requests.get(api_url, proxies=proxies, timeout=15, verify=False)
-                    latency_ms = (time.time() - start_time) * 1000
-                    response.raise_for_status()
-                    api_data = response.json()
-                    if api_data.get("status") != "success": raise Exception("API 1 Error")
-                    proxy.info = f"{api_data.get('country', 'N/A')}, {api_data.get('regionName', 'N/A')} - {api_data.get('query', 'N/A')}"
-                except Exception as e1:
-                    Clock.schedule_once(lambda dt: app.root.log_message(f"-> API 1 failed: {e1}. Trying fallback..."))
-                    start_time = time.time()
-                    api_url = "https://ipinfo.io/json"
-                    response = requests.get(api_url, proxies=proxies, timeout=15, verify=False)
-                    latency_ms = (time.time() - start_time) * 1000
-                    response.raise_for_status()
-                    api_data = response.json()
-                    proxy.info = f"{api_data.get('country', 'N/A')}, {api_data.get('region', 'N/A')} - {api_data.get('ip', 'N/A')}"
-                
-                proxy.status = "Reachable"
-                proxy.latency = f"{latency_ms:.0f}ms"
-                Clock.schedule_once(lambda dt: app.root.log_message(f"-> Geo-IP Success for {proxy.label}: {proxy.info}"))
 
-            else: # Fallback for other types or if dependencies are missing
+            else: 
                 latency_ms, resolved_ip = _tcp_ping_host(host, int(port))
                 if latency_ms == float('inf'):
                     raise Exception(resolved_ip)
                 proxy.status = "Reachable"
                 proxy.latency = f"{latency_ms:.0f}ms"
                 proxy.info = f"Resolved IP: {resolved_ip}"
-                Clock.schedule_once(lambda dt: app.root.log_message(f"-> Ping Success for {proxy.label}. Latency: {proxy.latency}"))
+                self.log_message(f"-> Ping Success for {proxy.label}. Latency: {proxy.latency}")
 
         except Exception as e:
             proxy.status = "Unreachable"
             proxy.latency = "N/A"
             error_message = str(e).splitlines()[0]
             proxy.info = f"Error: {error_message}"
-            Clock.schedule_once(lambda dt: app.root.log_message(f"-> Failure for {proxy.label}. Reason: {error_message}"))
+            self.log_message(f"-> Failure for {proxy.label}. Reason: {error_message}")
 
         if proxy.ui_widget:
             Clock.schedule_once(lambda dt: proxy.ui_widget.update_ui())
@@ -768,6 +787,9 @@ class SingboxApp(MDApp):
     def handle_back_button(self, *args, **kwargs):
         """Handles the back button press for natural navigation."""
         main_screen = self.root
+        if main_screen.dialog:
+            main_screen.dialog.dismiss()
+            return True
         if main_screen.tab_panel.get_current_tab() != main_screen.tab_add_proxy:
             main_screen.switch_to_tab("Add Proxy")
             return True
@@ -777,8 +799,7 @@ class SingboxApp(MDApp):
         if self.store.exists('settings'):
             settings = self.store.get('settings')
             theme_style = settings.get('theme_style', 'Dark')
-            self.theme_cls.theme_style = theme_style
-            self.root.theme_button.text = f"Theme: {theme_style}"
+            self.root.change_theme(theme_style)
             dns_on = settings.get('dns_on', False)
             self.root.dns_protection_on = dns_on
             self.root.dns_switch.active = dns_on
