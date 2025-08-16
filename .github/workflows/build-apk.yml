@@ -1,4 +1,4 @@
-name: Build APK
+name: Build SingBoxConfig APK
 
 on:
   push:
@@ -10,25 +10,37 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Step 1: Checkout repository
       - name: Checkout code
         uses: actions/checkout@v3
 
+      # Step 2: Install system dependencies
       - name: Install dependencies
         run: |
           sudo apt update
           sudo apt install -y python3-pip python3-dev git zip unzip openjdk-17 zlib1g-dev
 
+      # Step 3: Install Buildozer & Cython
       - name: Install Buildozer
         run: |
           pip install --upgrade pip
           pip install cython buildozer
 
+      # Step 4: Initialize Buildozer if needed
+      - name: Ensure buildozer.spec exists
+        run: |
+          if [ ! -f buildozer.spec ]; then
+            buildozer init
+          fi
+
+      # Step 5: Build APK (debug)
       - name: Build APK
         run: |
           buildozer -v android debug
 
+      # Step 6: Upload APK as artifact
       - name: Upload APK
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: SingBoxConfig-debug-apk
           path: bin/*.apk
