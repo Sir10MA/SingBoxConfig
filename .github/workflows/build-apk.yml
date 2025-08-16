@@ -14,31 +14,43 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # Step 2: Install system dependencies
-      - name: Install dependencies
+      # Step 2: Install dependencies
+      - name: Install system dependencies
         run: |
           sudo apt update
-          sudo apt install -y python3-pip python3-dev git zip unzip zlib1g-dev default-jdk
+          sudo apt install -y python3-pip python3-dev git zip unzip zlib1g-dev default-jdk wget
 
-      # Step 3: Install Buildozer & Cython
+      # Step 3: Setup Android SDK & Build Tools (fixes "aidl not found")
+      - name: Setup Android SDK
+        run: |
+          mkdir -p $HOME/android-sdk
+          wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
+          unzip cmdline-tools.zip -d $HOME/android-sdk/
+          mkdir -p $HOME/android-sdk/cmdline-tools/latest
+          mv $HOME/android-sdk/cmdline-tools/* $HOME/android-sdk/cmdline-tools/latest/
+          export ANDROID_HOME=$HOME/android-sdk
+          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin
+          yes | sdkmanager --sdk_root=$ANDROID_HOME "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+
+      # Step 4: Install Buildozer & Cython
       - name: Install Buildozer
         run: |
           pip install --upgrade pip
           pip install cython buildozer
 
-      # Step 4: Ensure buildozer.spec exists
+      # Step 5: Ensure buildozer.spec exists
       - name: Ensure buildozer.spec exists
         run: |
           if [ ! -f buildozer.spec ]; then
             buildozer init
           fi
 
-      # Step 5: Build debug/unsigned APK
+      # Step 6: Build unsigned APK
       - name: Build unsigned APK
         run: |
           buildozer -v android debug
 
-      # Step 6: Upload APK as artifact
+      # Step 7: Upload APK as artifact
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
