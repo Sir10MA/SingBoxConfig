@@ -1,65 +1,26 @@
 [app]
-
-# (str) Title of your application
-title = SingConfigMaker
-
-# (str) Package name
-package.name = singconfig
-
-# (str) Package domain (needed for android/ios packaging)
+title = Singbox Generator
+package.name = singboxgenerator
 package.domain = org.example
-
-# (str) Source code where the main.py live
 source.dir = .
-
-# (list) Source files to include (let empty to include all)
-source.include_exts = py,png,jpg,kv,json
-
-# (str) Application versioning
-version = 1.0.0
-
-# (str) Python version
-requirements = python3,kivy,kivymd
-
-# (bool) Indicate if the application should be fullscreen
-fullscreen = 0
-
-# (str) Orientation
+source.include_exts = py,kv,png,jpg,atlas,json,txt
+version = 1.0
+requirements = python3,kivy,kivymd,requests
 orientation = portrait
+fullscreen = 0
+android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE
 
-# ----------------------------------------------------------------
-# Android specific
-# ----------------------------------------------------------------
+# For KivyMD + Material Icons
+android.presplash = presplash.png
+android.icon = icon.png
+
 [buildozer]
-
-# (str) Android SDK path
-android.sdk_path = /home/userland/android-sdk
-
-# (str) Android NDK path (optional, can be auto-downloaded)
-# android.ndk_path = /home/userland/android-ndk
-
-# (str) Android API to use
-android.api = 31
-
-# (str) Android build-tools version
-android.build_tools = 33.0.2
-
-# (str) Minimum Android API required
-android.minapi = 21
-
-# (str) Target Android API
-android.target = 31
-
-# (str) Package format
-android.arch = arm64-v8a
-
-# ----------------------------------------------------------------
-# Permissions and features
-# ----------------------------------------------------------------
-android.permissions = INTERNET
-
-# ----------------------------------------------------------------
-# Additional settings
-# ----------------------------------------------------------------
 log_level = 2
-warn_on_root = 1
+warn_on_root = 0
+
+# Android build settings
+android.api = 33
+android.minapi = 21
+android.ndk = 25.2.9519653
+android.sdk = 33
+android.archs = arm64-v8a,armeabi-v7a
