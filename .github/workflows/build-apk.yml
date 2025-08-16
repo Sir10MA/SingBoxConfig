@@ -1,67 +1,121 @@
-name: Build Universal APK with Python-for-Android
+# GitHub Actions workflow to build a KivyMD Python app into an Android APK
 
-# This workflow runs on pushes to the 'main' branch or can be triggered manually.
+name: Build Android APK
+
+# Controls when the workflow will run
 on:
+  # Triggers the workflow on push events but only for the "main" branch
   push:
     branches: [ "main" ]
+  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
 jobs:
-  build-android-p4a:
-    runs-on: ubuntu-latest
+  build-android:
+    runs-on: ubuntu-latest # Use the latest Ubuntu runner
 
     steps:
-      - name: Checkout repository
+      # 1. Checkout the repository code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Java (for Android SDK)
+      # 2. Set up Java Development Kit (JDK)
+      # Buildozer requires a specific JDK version to build for Android
+      - name: Set up JDK 11
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '11'
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      # 3. Set up Python
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v4
         with:
-          python-version: '3.9'
+          python-version: 3.9
 
-      - name: Install system dependencies
+      # 4. Install system dependencies for Buildozer
+      # These are required for the Android SDK/NDK and other build tools
+      - name: Install Buildozer system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y git zip unzip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev
+          sudo apt-get install -y \
+              python3-pip \
+              build-essential \
+              git \
+              zip \
+              unzip \
+              pkg-config \
+              libgl1-mesa-dev \
+              libgstreamer1.0-dev \
+              libgstreamer-plugins-base1.0-dev \
+              libmtdev-dev \
+              libsdl2-dev \
+              libsdl2-image-dev \
+              libsdl2-mixer-dev \
+              libsdl2-ttf-dev \
+              libfreetype6-dev \
+              libffi-dev \
+              libssl-dev \
+              ccache \
+              autoconf \
+              libtool \
+              libltdl-dev \
+              cmake
 
-      - name: Install Python dependencies (p4a, Cython)
+      # 5. Install Python dependencies (Cython and Buildozer)
+      - name: Install Python dependencies
         run: |
-          pip install --upgrade cython
-          pip install --upgrade python-for-android
+          python -m pip install --upgrade pip
+          pip install "cython<3.0" # Cython < 3.0 is often more compatible
+          pip install buildozer
 
-      - name: Build universal unsigned APK with p4a
+      # 6. Create the buildozer.spec file
+      # This file configures the entire build process, including app name,
+      # requirements, permissions, and Android versions.
+      - name: Create buildozer.spec
         run: |
-          p4a apk \
-            --universal \
-            --unsigned \
-            --requirements=python3,kivy,requests,pyyaml \
-            --private=. \
-            --package=com.yourdomain.singboxconfig \
-            --name="Sing-box Config Maker" \
-            --version=1.0 \
-            --bootstrap=sdl2 \
-            --permission=INTERNET \
-            --permission=WRITE_EXTERNAL_STORAGE \
-            --permission=READ_EXTERNAL_STORAGE \
-            --entrypoint=TheBest_fixed_plus4.py \
-            --android-api=33 \
-            --ndk-version=25b \
-            --release \
-            --dist-name=singbox_dist
+          cat > buildozer.spec << EOF
+          [app]
+          title = Sing-box Config Maker
+          package.name = singboxconfig
+          package.domain = org.example
+          source.dir = .
+          source.include_exts = py,png,jpg,kv,atlas,json
+          version = 0.1
+          requirements = python3,kivy,kivymd,requests,pysocks
+          orientation = portrait
+          icon.filename = %(source.dir)s/icon.png
+          
+          [buildozer]
+          log_level = 2
+          warn_on_root = 1
+          
+          [android]
+          fullscreen = 0
+          # Permissions your app needs
+          android.permissions = INTERNET, ACCESS_NETWORK_STATE
+          
+          # Target Android API level
+          android.api = 31
+          android.minapi = 21
+          
+          # Android SDK and NDK versions to use
+          android.sdk = 24
+          android.ndk = 25b
+          
+          # Architectures to build for
+          android.archs = arm64-v8a, armeabi-v7a
+          EOF
 
-      - name: Find and rename APK
-        run: |
-          # The output file name is dynamic, so we find it and give it a static name.
-          find dist -name "*-release-unsigned.apk" -exec mv {} singbox-config-maker-universal.apk \;
+      # 7. Run the Buildozer build command
+      # This step downloads the Android SDK/NDK and compiles the APK
+      - name: Build with Buildozer
+        run: buildozer -v android debug
 
-      - name: Upload Unsigned APK Artifact
+      # 8. Upload the generated APK as a build artifact
+      # This makes the APK file available for download from the workflow's summary page.
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: singbox-config-maker-universal-apk
-          path: singbox-config-maker-universal.apk
+          name: singbox-config-maker-apk
+          path: bin/*.apk
