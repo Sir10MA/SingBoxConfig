@@ -18,7 +18,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-pip python3-dev git zip unzip zlib1g-dev openjdk-17-jdk wget
+          sudo apt-get install -y python3-pip python3-dev git zip unzip zlib1g-dev openjdk-17-jdk wget build-essential cmake flex bison
 
       # Step 3: Setup Android SDK & Build Tools
       - name: Setup Android SDK
@@ -27,14 +27,35 @@ jobs:
           wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
           unzip cmdline-tools.zip -d $HOME/android-sdk/cmdline-tools
           mv $HOME/android-sdk/cmdline-tools/cmdline-tools $HOME/android-sdk/cmdline-tools/latest
+
           export ANDROID_HOME=$HOME/android-sdk
           export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/33.0.2
 
           yes | sdkmanager --sdk_root=$ANDROID_HOME --licenses
           yes | sdkmanager --sdk_root=$ANDROID_HOME "platform-tools" "platforms;android-33" "build-tools;33.0.2" "ndk;25.1.8937393"
 
-          # Force symlink aidl into PATH
-          ln -sf $ANDROID_HOME/build-tools/33.0.2/aidl $ANDROID_HOME/cmdline-tools/latest/bin/aidl
+          # Force symlink aidl
+          mkdir -p $HOME/.local/bin
+          if [ -f $ANDROID_HOME/build-tools/33.0.2/aidl ]; then
+            ln -sf $ANDROID_HOME/build-tools/33.0.2/aidl $HOME/.local/bin/aidl
+          fi
+
+      # Step 3b: Fallback - Build AIDL from AOSP if missing
+      - name: Fallback AIDL build
+        run: |
+          export ANDROID_HOME=$HOME/android-sdk
+          if [ ! -f $ANDROID_HOME/build-tools/33.0.2/aidl ]; then
+            echo "AIDL not found, building from AOSP..."
+            git clone https://android.googlesource.com/platform/system/tools/aidl $HOME/aidl-src
+            cd $HOME/aidl-src
+            mkdir build && cd build
+            cmake ..
+            make -j$(nproc)
+            # Install compiled aidl
+            mkdir -p $ANDROID_HOME/build-tools/33.0.2
+            cp aidl/aidl $ANDROID_HOME/build-tools/33.0.2/
+            ln -sf $ANDROID_HOME/build-tools/33.0.2/aidl $HOME/.local/bin/aidl
+          fi
 
       # Step 4: Install Buildozer
       - name: Install Buildozer
@@ -53,7 +74,7 @@ jobs:
       - name: Build unsigned APK
         run: |
           export ANDROID_HOME=$HOME/android-sdk
-          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/33.0.2
+          export PATH=$PATH:$HOME/.local/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/33.0.2
           buildozer -v android debug
 
       # Step 7: Upload APK as artifact
