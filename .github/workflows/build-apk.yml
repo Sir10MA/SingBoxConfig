@@ -36,15 +36,17 @@ jobs:
             ~/.cache/pip
             ~/.local/share/python-for-android
             .p4a
-          key: p4a-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+          key: p4a-${{ runner.os }}-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
             p4a-${{ runner.os }}
 
+      # [FIXED] Install a complete set of build tools, including libtool
       - name: Install system deps (Noble-friendly)
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             git zip unzip wget curl build-essential \
+            autoconf automake libtool \
             libncurses6 libstdc++6 \
             zlib1g zlib1g-dev \
             libffi-dev libssl-dev \
@@ -101,15 +103,14 @@ jobs:
             --name "SingBox Generator" \
             --version 0.1 \
             --bootstrap sdl2 \
-            --requirements=python3,kivy==2.2.1,kivymd==1.1.1,requests \
-            --recipes=libffi,openssl,sqlite3 \
+            --requirements=python3,kivy==2.2.1,kivymd==1.1.1,requests,pysocks \
             --arch=armeabi-v7a \
             --arch=arm64-v8a \
             --sdk-dir="$ANDROID_SDK_ROOT" \
             --ndk-dir="$ANDROID_NDK_ROOT" \
             --android-api=33 \
-            --use-setup-py \
-            --output-filename singbox-universal.apk
+            --copy-libs \
+            --output singbox-universal.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
