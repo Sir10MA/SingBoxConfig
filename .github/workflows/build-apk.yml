@@ -1,0 +1,34 @@
+name: Build APK
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y python3-pip python3-dev git zip unzip openjdk-17 zlib1g-dev
+
+      - name: Install Buildozer
+        run: |
+          pip install --upgrade pip
+          pip install cython buildozer
+
+      - name: Build APK
+        run: |
+          buildozer -v android debug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: SingBoxConfig-debug-apk
+          path: bin/*.apk
