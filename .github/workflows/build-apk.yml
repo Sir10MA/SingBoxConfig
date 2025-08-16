@@ -4,67 +4,59 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      # Step 1: Checkout repository
+      - name: Checkout code
+        uses: actions/checkout@v3
 
+      # Step 2: Install dependencies
       - name: Install system dependencies
         run: |
-          sudo apt update
-          sudo apt install -y \
-            python3-pip python3-setuptools python3-wheel \
-            python3-dev git zip unzip zlib1g-dev openjdk-17-jdk wget \
-            libncurses5-dev libffi-dev libssl-dev
+          sudo apt-get update
+          sudo apt-get install -y python3-pip python3-dev git zip unzip zlib1g-dev openjdk-17-jdk wget
 
+      # Step 3: Setup Android SDK & Build Tools
       - name: Setup Android SDK
         run: |
           mkdir -p $HOME/android-sdk/cmdline-tools
           wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
           unzip cmdline-tools.zip -d $HOME/android-sdk/cmdline-tools
           mv $HOME/android-sdk/cmdline-tools/cmdline-tools $HOME/android-sdk/cmdline-tools/latest
-
           export ANDROID_HOME=$HOME/android-sdk
-          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
+          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/33.0.2
 
-          yes | sdkmanager --licenses
-          yes | sdkmanager --sdk_root=$ANDROID_HOME \
-            "platform-tools" "platforms;android-33" "build-tools;33.0.2" "build-tools;30.0.3"
+          yes | sdkmanager --sdk_root=$ANDROID_HOME --licenses
+          yes | sdkmanager --sdk_root=$ANDROID_HOME "platform-tools" "platforms;android-33" "build-tools;33.0.2" "ndk;25.1.8937393"
 
-          # Symlink aidl from build-tools into a place Buildozer expects
-          mkdir -p $ANDROID_HOME/tools/bin
-          ln -sf $ANDROID_HOME/build-tools/33.0.2/aidl $ANDROID_HOME/tools/bin/aidl || true
-          ln -sf $ANDROID_HOME/build-tools/30.0.3/aidl $ANDROID_HOME/tools/bin/aidl || true
+          # Force symlink aidl into PATH
+          ln -sf $ANDROID_HOME/build-tools/33.0.2/aidl $ANDROID_HOME/cmdline-tools/latest/bin/aidl
 
-          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
-          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
-          echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
-          echo "$ANDROID_HOME/build-tools/33.0.2" >> $GITHUB_PATH
-          echo "$ANDROID_HOME/tools/bin" >> $GITHUB_PATH
-
+      # Step 4: Install Buildozer
       - name: Install Buildozer
         run: |
           pip install --upgrade pip
           pip install cython buildozer
 
+      # Step 5: Ensure buildozer.spec exists
       - name: Ensure buildozer.spec exists
         run: |
           if [ ! -f buildozer.spec ]; then
             buildozer init
           fi
 
+      # Step 6: Build unsigned APK
       - name: Build unsigned APK
         run: |
           export ANDROID_HOME=$HOME/android-sdk
-          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/33.0.2:$ANDROID_HOME/tools/bin
-          which aidl
-          aidl --version || echo "aidl found but version check failed"
+          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/33.0.2
           buildozer -v android debug
 
+      # Step 7: Upload APK as artifact
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
