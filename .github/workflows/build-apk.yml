@@ -1,4 +1,4 @@
-name: Build APK (p4a)
+name: Build Universal APK (p4a)
 
 on:
   push:
@@ -22,15 +22,30 @@ jobs:
             python3 python3-pip python3-setuptools git zip unzip openjdk-17-jdk \
             libffi-dev libssl-dev libjpeg-dev zlib1g-dev
 
-      # Step 3: Install python-for-android (p4a)
+      # Step 3: Install python-for-android
       - name: Install python-for-android
         run: |
           pip install --upgrade pip
           pip install python-for-android cython
 
-      # Step 4: Build APK with p4a
+      # Step 4: Setup Android SDK + NDK
+      - name: Setup Android SDK and NDK
+        run: |
+          mkdir -p $HOME/android-sdk
+          wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O sdk-tools.zip
+          unzip sdk-tools.zip -d $HOME/android-sdk/cmdline-tools
+          mv $HOME/android-sdk/cmdline-tools/cmdline-tools $HOME/android-sdk/cmdline-tools/latest
+          export ANDROIDSDK=$HOME/android-sdk
+          export PATH=$PATH:$ANDROIDSDK/cmdline-tools/latest/bin:$ANDROIDSDK/platform-tools
+          yes | sdkmanager --sdk_root=$ANDROIDSDK "platform-tools" "platforms;android-33" "build-tools;33.0.2" "ndk;25.2.9519653"
+          echo "ANDROIDSDK=$ANDROIDSDK" >> $GITHUB_ENV
+          echo "ANDROIDNDK=$ANDROIDSDK/ndk/25.2.9519653" >> $GITHUB_ENV
+          echo "PATH=$PATH" >> $GITHUB_ENV
+
+      # Step 5: Build Universal APK
       - name: Build APK
         run: |
+          source $GITHUB_ENV
           p4a apk \
             --private . \
             --package=org.singbox.generator \
@@ -38,13 +53,14 @@ jobs:
             --version 0.1 \
             --bootstrap sdl2 \
             --requirements=python3,kivy,kivymd,requests \
-            --sdk-dir $HOME/android-sdk \
-            --ndk-dir $HOME/android-ndk \
-            --arch armeabi-v7a
+            --sdk-dir $ANDROIDSDK \
+            --ndk-dir $ANDROIDNDK \
+            --arch=armeabi-v7a \
+            --arch=arm64-v8a
 
-      # Step 5: Upload APK as artifact
+      # Step 6: Upload APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: SingBoxGenerator-unsigned
+          name: SingBoxGenerator-Universal
           path: dist/*.apk
