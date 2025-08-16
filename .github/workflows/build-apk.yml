@@ -30,19 +30,21 @@ jobs:
           pip install --upgrade pip
           pip install python-for-android
 
-      # Step 4: Setup Android SDK & NDK
+      # Step 4: Setup Android SDK & NDK properly
       - name: Setup Android SDK & NDK
         run: |
-          mkdir -p $HOME/android-sdk
+          mkdir -p $HOME/android-sdk/cmdline-tools
           wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
-          unzip cmdline-tools.zip -d $HOME/android-sdk/
-          mkdir -p $HOME/android-sdk/cmdline-tools/latest
-          mv $HOME/android-sdk/cmdline-tools/bin $HOME/android-sdk/cmdline-tools/latest/
+          unzip cmdline-tools.zip -d $HOME/android-sdk/cmdline-tools
+          mv $HOME/android-sdk/cmdline-tools/cmdline-tools $HOME/android-sdk/cmdline-tools/latest
+          
           export ANDROID_HOME=$HOME/android-sdk
-          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
+          export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
+          
+          yes | sdkmanager --sdk_root=$ANDROID_HOME --licenses
           yes | sdkmanager --sdk_root=$ANDROID_HOME "platform-tools" "platforms;android-33" "build-tools;33.0.2" "ndk;25.2.9519653"
 
-      # Step 5: Patch autotools for libffi
+      # Step 5: Patch autotools (libffi fix)
       - name: Patch autotools
         run: |
           autoreconf --install --force || true
@@ -51,7 +53,7 @@ jobs:
       - name: Build APK
         run: |
           export ANDROID_HOME=$HOME/android-sdk
-          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
+          export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
           p4a apk \
             --private . \
             --package=org.singbox.generator \
