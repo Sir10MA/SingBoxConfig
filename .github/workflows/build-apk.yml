@@ -1,93 +1,118 @@
-# GitHub Actions workflow to build a KivyMD app using python-for-android (p4a) directly.
-
-name: Build Android APK with P4A
+name: Android APK Build (p4a, universal, cached)
 
 on:
-  push:
-    branches: [ "main" ]
   workflow_dispatch:
+  push:
+    branches: [ main ]
 
 jobs:
-  build-android:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout the repository code
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2. Set up Java Development Kit (JDK) 11
-      - name: Set up JDK 11
-        uses: actions/setup-java@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          distribution: 'temurin'
-          java-version: '11'
+          python-version: "3.10"
 
-      # 3. Set up Python 3.9
-      - name: Set up Python 3.9
-        uses: actions/setup-python@v4
+      # Cache Android SDK/NDK to speed up repeat builds
+      - name: Cache Android SDK/NDK
+        uses: actions/cache@v4
         with:
-          python-version: 3.9
+          path: |
+            ~/android-sdk
+          key: android-sdk-${{ runner.os }}-33-25.2.9519653
+          restore-keys: |
+            android-sdk-${{ runner.os }}
 
-      # 4. Manually Install Android SDK
-      # This ensures a stable environment with all necessary tools in the PATH.
-      - name: Install Android SDK
-        run: |
-          SDK_ROOT=${HOME}/android-sdk
-          echo "ANDROID_SDK_ROOT=${SDK_ROOT}" >> $GITHUB_ENV
-          echo "SDK_ROOT=${SDK_ROOT}" >> $GITHUB_ENV
-          
-          mkdir -p ${SDK_ROOT}
-          wget --quiet https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
-          unzip -q cmdline-tools.zip -d ${SDK_ROOT}/cmdline-tools
-          mv ${SDK_ROOT}/cmdline-tools/cmdline-tools ${SDK_ROOT}/cmdline-tools/latest
-          rm cmdline-tools.zip
-          
-          echo "${SDK_ROOT}/cmdline-tools/latest/bin" >> $GITHUB_PATH
-          echo "${SDK_ROOT}/platform-tools" >> $GITHUB_PATH
-          
-          yes | sdkmanager --licenses > /dev/null
-          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2" "ndk;25.2.9519653"
+      # Cache pip + p4a artifacts
+      - name: Cache pip & p4a
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.local/share/python-for-android
+            .p4a
+          key: p4a-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            p4a-${{ runner.os }}
 
-      # 5. Install Python dependencies, including python-for-android
-      - name: Install dependencies
+      - name: Install system deps (Noble-friendly)
         run: |
           sudo apt-get update
-          sudo apt-get install -y ccache autoconf libtool pkg-config
-          python -m pip install --upgrade pip
-          pip install "cython<3.0"
+          sudo apt-get install -y \
+            git zip unzip wget curl build-essential \
+            libncurses6 libstdc++6 \
+            zlib1g zlib1g-dev \
+            libffi-dev libssl-dev \
+            libjpeg-dev libfreetype6-dev libsqlite3-dev \
+            openjdk-17-jdk
+
+      - name: Install python-for-android
+        run: |
+          python -m pip install --upgrade pip wheel setuptools
+          # Cython helps compile some recipes
+          pip install Cython
           pip install python-for-android
 
-      # 6. Build the APK using the p4a command
-      # This single command defines all the app's properties and triggers the build.
-      - name: Build with python-for-android
+      - name: Install Android SDK + NDK (cmdline-tools fixed layout)
+        shell: bash
         run: |
+          export ANDROID_HOME="$HOME/android-sdk"
+          export ANDROID_SDK_ROOT="$ANDROID_HOME"
+          mkdir -p "$ANDROID_HOME/cmdline-tools"
+
+          if [ ! -d "$ANDROID_HOME/cmdline-tools/latest" ]; then
+            echo "Downloading Android cmdline-tools…"
+            wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline-tools.zip
+            unzip -q cmdline-tools.zip -d "$ANDROID_HOME/cmdline-tools"
+            # Zip extracts to cmdline-tools/cmdline-tools/{bin,lib,...}
+            mv "$ANDROID_HOME/cmdline-tools/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest"
+          fi
+
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+          yes | sdkmanager --sdk_root="$ANDROID_HOME" --licenses || true
+
+          sdkmanager --sdk_root="$ANDROID_HOME" \
+            "platform-tools" \
+            "platforms;android-33" \
+            "build-tools;33.0.2" \
+            "ndk;25.2.9519653"
+
+          # Persist env for next steps
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
+          echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
+          echo "$ANDROID_HOME/build-tools/33.0.2" >> $GITHUB_PATH
+
+      - name: Build universal APK with p4a (no Buildozer)
+        shell: bash
+        run: |
+          source "$GITHUB_ENV"
+          # Use p4a’s own recipes to avoid autoreconf/libffi macro issues
           p4a apk \
-            --name="Sing-box Config Maker" \
-            --package=org.example.singboxconfig \
-            --version=0.5 \
-            --private=. \
-            --requirements=python3,kivy,kivymd,requests,pysocks \
-            --permission=INTERNET \
-            --permission=ACCESS_NETWORK_STATE \
-            --android-api=33 \
-            --min-api=21 \
-            --arch=arm64-v8a \
+            --private . \
+            --package=org.singbox.generator \
+            --name "SingBox Generator" \
+            --version 0.1 \
+            --bootstrap sdl2 \
+            --requirements=python3,kivy==2.2.1,kivymd==1.1.1,requests \
+            --recipes=libffi,openssl,sqlite3 \
             --arch=armeabi-v7a \
-            --bootstrap=sdl2 \
-            --icon="icon.png" \
-            --orientation=portrait \
-            --debug
+            --arch=arm64-v8a \
+            --sdk-dir="$ANDROID_SDK_ROOT" \
+            --ndk-dir="$ANDROID_NDK_ROOT" \
+            --android-api=33 \
+            --use-setup-py \
+            --output-filename singbox-universal.apk
 
-      # 7. Find and rename the APK for easy uploading
-      # The generated APK has a generic name, so we find it and give it a clear one.
-      - name: Locate and Rename APK
-        run: |
-          find . -name "*.apk" -exec mv {} singbox-config-maker.apk \;
-
-      # 8. Upload the generated APK as a build artifact
-      - name: Upload APK
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: singbox-config-maker-apk
-          path: singbox-config-maker.apk
+          name: SingBoxGenerator-Universal
+          path: singbox-universal.apk
