@@ -1,5 +1,5 @@
 # GitHub Actions workflow to build a KivyMD Python app into an Android APK
-# Version 3: Uses a dedicated action to pre-install the Android SDK for reliability.
+# Version 4: Updated the SDK setup action to resolve the download error.
 
 name: Build Android APK
 
@@ -30,18 +30,17 @@ jobs:
         with:
           python-version: 3.9
 
-      # 4. [NEW] Set up Android SDK
-      # This is the key fix. We pre-install the SDK and build-tools so that
-      # executables like 'aidl' are guaranteed to be in the system PATH.
+      # 4. [FIXED] Set up Android SDK
+      # Updated the action to the latest stable version (v3) to fix the resolving error.
       - name: Set up Android SDK
-        uses: android-actions/setup-sdk@v2.2.1
+        uses: android-actions/setup-sdk@v3
         with:
           # API level of the platform to install
           api-level: 33
           # Version of the build tools to install
-          build-tools-version: 33.0.2
+          build-tools: 33.0.2
           # NDK version to install
-          ndk-version: 25.1.8937393
+          ndk: 25.2.9519653
 
       # 5. Install Python and system dependencies
       - name: Install dependencies
@@ -62,7 +61,7 @@ jobs:
           package.domain = org.example
           source.dir = .
           source.include_exts = py,png,jpg,kv,atlas,json
-          version = 0.2
+          version = 0.3
           requirements = python3,kivy,kivymd,requests,pysocks
           orientation = portrait
           icon.filename = %(source.dir)s/icon.png
@@ -75,17 +74,15 @@ jobs:
           fullscreen = 0
           android.permissions = INTERNET, ACCESS_NETWORK_STATE
           
-          # We don't need to specify build_tools here anymore
-          # because the SDK is pre-installed in the step above.
           android.api = 33
           android.minapi = 21
-          android.ndk = 25b # Buildozer uses this to find the pre-installed NDK
+          # This NDK version should match what is installed by the setup-sdk action
+          android.ndk = 25b 
           
           android.archs = arm64-v8a, armeabi-v7a
           EOF
 
-      # 7. [NEW] Clean previous buildozer artifacts
-      # This ensures a completely fresh build without any cached errors.
+      # 7. Clean previous buildozer artifacts
       - name: Clean buildozer cache
         run: buildozer appclean
 
