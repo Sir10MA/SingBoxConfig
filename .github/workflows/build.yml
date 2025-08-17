@@ -10,26 +10,40 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout repository
+      # 1. Checkout the repo
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Build APK with Buildozer (latest stable)
+      # 2. Set up Python
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+
+      # 3. Install system dependencies
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential git zip unzip openjdk-17-jdk python3-pip python3-setuptools python3-dev libffi-dev libssl-dev libsqlite3-dev zlib1g-dev libjpeg-dev libfreetype6-dev liblcms2-dev pkg-config autoconf automake libtool cmake
+          pip install --upgrade pip
+          pip install cython==0.29.36
+
+      # 4. Build APK using ArtemSBulgakov/buildozer-action
       - name: Build APK
         uses: ArtemSBulgakov/buildozer-action@v1
         with:
           workdir: .
-          command: android debug
-          # buildozer_version: leave blank to use latest
+          build_command: buildozer -v android debug
+          python_version: '3.9'
 
-      # 3. Read version from buildozer.spec
+      # 5. Read version from buildozer.spec
       - name: Get version from buildozer.spec
         id: get_version
         run: |
           version=$(grep '^version =' buildozer.spec | awk -F= '{print $2}' | tr -d ' ')
           echo "VERSION=$version" >> $GITHUB_ENV
 
-      # 4. Create or update GitHub Release and upload APK
+      # 6. Create or update GitHub Release and upload APK
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
