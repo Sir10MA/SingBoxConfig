@@ -14,13 +14,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Build APK with Buildozer
+      # 2. Build APK with Buildozer (latest stable)
       - name: Build APK
         uses: ArtemSBulgakov/buildozer-action@v1
         with:
           workdir: .
           command: android debug
-          buildozer_version: "1.4.1"
+          # buildozer_version: leave blank to use latest
 
       # 3. Read version from buildozer.spec
       - name: Get version from buildozer.spec
@@ -38,4 +38,3 @@ jobs:
           files: bin/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    
