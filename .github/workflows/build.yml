@@ -1,57 +1,47 @@
-name: Build APK
+name: Build Android APK
 
+# Controls when the action will run.
 on:
-  push:          # run automatically on pushes
-    branches:
-      - main
-  pull_request:  # also run on pull requests to main
+  # Triggers the workflow on push events but only for the "main" branch
+  push:
+    branches: [ "main" ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: ubuntu-20.04
+  build-apk:
+    runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v2
+      # 1. Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential \
-            git \
-            zip \
-            unzip \
-            openjdk-17-jdk \
-            python3-pip \
-            python3-setuptools \
-            python3-dev \
-            libffi-dev \
-            libssl-dev \
-            libsqlite3-dev \
-            zlib1g-dev \
-            libjpeg-dev \
-            libfreetype6-dev \
-            liblcms2-dev \
-            pkg-config \
-            autoconf \
-            automake \
-            libtool \
-            cmake
-          pip install --upgrade pip
-          pip install buildozer cython==0.29.36
-
-      - name: Build APK (with AIDL fix)
-        run: |
-          # Set Android SDK root
-          export ANDROID_SDK_ROOT=$HOME/.buildozer/android/platform/android-sdk
-          # Add build-tools + platform-tools to PATH
-          export PATH=$ANDROID_SDK_ROOT/build-tools/34.0.0:$ANDROID_SDK_ROOT/platform-tools:$PATH
-          # Run Buildozer
-          buildozer -v android debug
-
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v2
+      # 2. Set up Python for the spec generator script
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          name: singboxconfig-apk
+          python-version: '3.9'
+
+      # 3. Run our script to generate the buildozer.spec file
+      - name: Generate buildozer.spec
+        run: python generate_spec.py
+
+      # 4. Use a pre-configured action to build the APK with Buildozer
+      - name: Build with Buildozer
+        uses: ArtemSBulgakov/buildozer-action@v1
+        id: buildozer
+        with:
+          workdir: .
+          # This command builds an unsigned release APK
+          build_command: buildozer -v android release unsigned
+
+      # 5. Upload the generated APK as a workflow artifact
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-apk
+          # Path to the APK file. Buildozer places it in the bin/ directory.
+          # The wildcard '*' matches the generated file name.
           path: bin/*.apk
