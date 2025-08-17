@@ -1,13 +1,13 @@
 [app]
 
 # (str) Title of your application
-title = BoxConFig
+title = BoxConfig
 
 # (str) Package name
-package.name = singboxconfig
+package.name = BoxConfig
 
 # (str) Package domain (needed for Android/iOS)
-package.domain = org.test
+package.domain = org.sirtenma
 
 # (str) Source code directory
 source.dir = .
