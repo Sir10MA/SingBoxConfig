@@ -37,4 +37,4 @@ jobs:
           name: Sing-Box Configurator v${{ env.VERSION }}
           files: bin/*.apk
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
