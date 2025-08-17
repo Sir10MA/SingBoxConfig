@@ -48,21 +48,22 @@ jobs:
           pip install --upgrade pip
           pip install buildozer cython==0.29.36
 
-      # 4. Pre-install Android SDK & build-tools to avoid AIDL error
+      # 4. Install Android SDK + build-tools, fix AIDL issue
       - name: Install Android SDK tools
         run: |
-          mkdir -p $HOME/.buildozer/android/platform/android-sdk
-          cd $HOME/.buildozer/android/platform/android-sdk
+          mkdir -p $HOME/.buildozer/android/platform
+          cd $HOME/.buildozer/android/platform
           wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
-          unzip cmdline-tools.zip
-          mkdir -p cmdline-tools/latest
-          mv cmdline-tools/* cmdline-tools/latest/
-          yes | cmdline-tools/latest/bin/sdkmanager --licenses
-          yes | cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0"
+          unzip -q cmdline-tools.zip -d cmdline-tools-temp
+          mkdir -p android-sdk/cmdline-tools/latest
+          mv cmdline-tools-temp/cmdline-tools/* android-sdk/cmdline-tools/latest/
+          yes | android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses
+          yes | android-sdk/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0"
 
-          # Add AIDL to PATH
+          # Add AIDL + SDK tools to PATH
           echo "$HOME/.buildozer/android/platform/android-sdk/build-tools/34.0.0" >> $GITHUB_PATH
           echo "$HOME/.buildozer/android/platform/android-sdk/platform-tools" >> $GITHUB_PATH
+          echo "$HOME/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
 
       # 5. Build APK
       - name: Build with Buildozer
