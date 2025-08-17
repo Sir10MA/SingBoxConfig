@@ -2,7 +2,7 @@
 # Basic app info
 title = Sing-Box Configurator
 package.name = singboxconfig
-package.domain = com.sirtenma
+package.domain = com.sirtenmaa
 
 # Entrypoint
 source.dir = .
