@@ -99,7 +99,7 @@ def _decode_shadowsocks(url: str) -> dict:
         method, password = userinfo.split(":", 1)
         return {"server": host, "server_port": port, "method": method, "password": password}
     except Exception: return {}
-
+    
 def parse_socks_string(s: str):
     m = re.match(r"^\s*([\w\.\-]+):(\d+)(?::([^:\s]+):([^:\s]+))?\s*$", (s or "").strip());
     if not m: return None
@@ -237,13 +237,13 @@ class ProxyDetailWidget(MDCard):
         main_row.add_widget(action_row)
 
         status_grid = MDGridLayout(cols=2, adaptive_height=True, padding=("48dp", "8dp", 0, "8dp"), spacing=("10dp", "5dp"))
-
+        
         status_grid.add_widget(MDLabel(text="Status:", font_style="Caption", bold=True, adaptive_height=True))
         self.lbl_status = MDLabel(font_style="Caption", adaptive_height=True)
-
+        
         status_grid.add_widget(MDLabel(text="Latency:", font_style="Caption", bold=True, adaptive_height=True))
         self.lbl_latency = MDLabel(font_style="Caption", adaptive_height=True)
-
+        
         status_grid.add_widget(MDLabel(text="Info:", font_style="Caption", bold=True, adaptive_height=True))
         self.lbl_info = MDLabel(font_style="Caption", adaptive_height=True, shorten=True, shorten_from='left')
 
@@ -259,7 +259,7 @@ class ProxyDetailWidget(MDCard):
     def _on_check(self, instance): MDApp.get_running_app().root.check_proxy(self.proxy)
     def _on_edit(self, instance): MDApp.get_running_app().root.edit_proxy(self.proxy)
     def _on_delete(self, instance): MDApp.get_running_app().root.confirm_delete_proxy(self.proxy)
-
+    
     def update_ui(self):
         self.lbl_label.text = self.proxy.label
         self.lbl_status.text = self.proxy.status
@@ -267,9 +267,9 @@ class ProxyDetailWidget(MDCard):
         self.lbl_info.text = self.proxy.info
         self.btn_check.disabled = (self.proxy.status == "Checking...")
         self.cb_select.active = self.proxy.selected
-
+        
         if self.proxy.status == "Reachable":
-            self.lbl_status.theme_text_color = "Primary"
+            self.lbl_status.theme_text_color = "Primary" 
         elif self.proxy.status in ["Unreachable", "Error"]:
             self.lbl_status.theme_text_color = "Error"
         else:
@@ -279,7 +279,6 @@ class MainScreen(MDScreen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.added_proxies = []; self.generated_config = ""; self.dns_protection_on = False; self.dialog = None
-        # --- APPLIED FIX: Initialize log_file_path property ---
         self.log_file_path = None
         root_layout = MDBoxLayout(orientation='vertical', spacing='10dp')
         header = MDBoxLayout(adaptive_height=True, spacing="10dp", padding=("10dp", "10dp", "10dp", 0))
@@ -287,12 +286,12 @@ class MainScreen(MDScreen):
         root_layout.add_widget(header)
         self.tab_panel = MDTabs(background_color=self.theme_cls.primary_color)
         self.tab_panel.bind(on_tab_switch=self.on_tab_switch)
-
+        
         # --- Add Proxy Tab ---
         self.tab_add_proxy = Tab(title="Add Proxy")
         add_proxy_scroll = MDScrollView()
         add_proxy_content = MDBoxLayout(orientation="vertical", adaptive_height=True, spacing="15dp", padding="15dp")
-
+        
         self.paste_input = MDTextField(
             hint_text="Paste any proxy string or config here",
             mode="rectangle"
@@ -321,20 +320,20 @@ class MainScreen(MDScreen):
         self.btn_add_proxy = MDRaisedButton(text="Add From Form", on_press=self.add_current_proxy, pos_hint={'center_x': 0.5})
         add_proxy_content.add_widget(self.btn_add_proxy)
         add_proxy_scroll.add_widget(add_proxy_content); self.tab_add_proxy.add_widget(add_proxy_scroll); self.tab_panel.add_widget(self.tab_add_proxy)
-
+        
         # --- Proxy List Tab ---
         self.tab_proxy_list = Tab(title="Proxy List")
         proxy_list_layout = MDBoxLayout(orientation='vertical', padding="10dp", spacing="10dp")
         self.proxies_list_container = MDList(); proxies_scroll = MDScrollView(); proxies_scroll.add_widget(self.proxies_list_container)
         proxy_list_layout.add_widget(proxies_scroll); self.tab_proxy_list.add_widget(proxy_list_layout); self.tab_panel.add_widget(self.tab_proxy_list)
-
+        
         # --- Settings Tab ---
         self.tab_settings = Tab(title="Settings")
         settings_content = MDBoxLayout(orientation="vertical", spacing="15dp", padding="20dp")
         dns_row = MDBoxLayout(adaptive_height=True, spacing="10dp"); dns_row.add_widget(MDLabel(text="DNS Protection", adaptive_height=True, halign="left"))
         self.dns_switch = MDCheckbox(active=self.dns_protection_on, size_hint_x=None, width="48dp"); self.dns_switch.bind(active=self.toggle_dns)
         dns_row.add_widget(self.dns_switch); settings_content.add_widget(dns_row)
-
+        
         theme_row = MDBoxLayout(adaptive_height=True, spacing="10dp"); theme_row.add_widget(MDLabel(text="App Theme", adaptive_height=True, halign="left"))
         self.theme_button = MDRaisedButton(text="Theme: Dark", on_press=self.open_theme_menu)
         theme_row.add_widget(self.theme_button)
@@ -346,7 +345,7 @@ class MainScreen(MDScreen):
         settings_content.add_widget(contact_row)
 
         self.tab_settings.add_widget(settings_content); self.tab_panel.add_widget(self.tab_settings)
-
+        
         # --- Log Tab ---
         self.tab_log = Tab(title="Log")
         log_layout = MDBoxLayout(orientation='vertical', padding="10dp")
@@ -372,19 +371,15 @@ class MainScreen(MDScreen):
         self.log_output.text += log_entry
         self.log_output.cursor = (0, len(self.log_output.text))
         
-        # --- APPLIED FIX: Write every log message to a safe, private file ---
         if self.log_file_path:
             try:
                 with open(self.log_file_path, "a", encoding="utf-8") as f:
                     f.write(log_entry)
             except Exception as e:
-                # Print error to console if file logging fails
                 print(f"CRITICAL: Failed to write to log file: {e}")
-
 
     def post_build_init(self, dt):
         self.set_proxy_type("WireGuard")
-        # --- APPLIED FIX: Define the safe log file path once the app is running ---
         app = MDApp.get_running_app()
         self.log_file_path = os.path.join(app.user_data_dir, "singbox_app_log.txt")
         self.log_message("Application initialized.")
@@ -411,7 +406,7 @@ class MainScreen(MDScreen):
         else:
             app.theme_cls.theme_style = theme_style
             app.theme_cls.primary_palette = "BlueGray"
-
+        
         self.theme_button.text = f"Theme: {theme_style}"
         self.log_message(f"Theme changed to {theme_style}.")
 
@@ -432,7 +427,7 @@ class MainScreen(MDScreen):
         except Exception: pass
         self.dialog = MDDialog(title=title, type="custom", content_cls=content_cls, buttons=buttons or [MDFlatButton(text="OK", on_release=lambda x: self.dialog.dismiss())])
         self.dialog.open()
-
+        
     def switch_to_tab(self, tab_name):
         try:
             for tab in self.tab_panel.get_tab_list():
@@ -456,10 +451,10 @@ class MainScreen(MDScreen):
         if not txt:
             self.show_dialog("Error", "Paste input is empty.")
             return
-
+        
         self.log_message(f"Detecting and parsing pasted text...")
         detected_type = detect_proxy_type(txt)
-
+        
         if detected_type in ["vmess", "vless", "shadowsocks"]:
             self.log_message(f"Detected {detected_type} link.")
             if self.add_proxy_from_string(txt):
@@ -501,7 +496,7 @@ class MainScreen(MDScreen):
             else:
                 self.show_dialog("Parse Failed", f"Could not parse the {detected_type.upper()} string.")
                 self.log_message(f"Failed to parse {detected_type.upper()} string.")
-
+        
         else:
             self.show_dialog("Detection Failed", "Could not determine the proxy type from the pasted text.")
             self.log_message("Could not detect proxy type from pasted text.")
@@ -557,7 +552,7 @@ class MainScreen(MDScreen):
             self.log_message(f"Added proxy from string: {label}")
             return True
         return False
-
+        
     def clear_form_inputs(self):
         for field in [self.wg_server, self.wg_port, self.wg_private_key, self.wg_local_address, self.wg_peer_public_key]:
             field.text = ""
@@ -575,7 +570,7 @@ class MainScreen(MDScreen):
             data = {"server": self.proxy_host.text.strip(), "server_port": int(self.proxy_port.text.strip() or 0), "username": self.proxy_user.text.strip(), "password": self.proxy_pass.text.strip()}
             label = f"{ptype.upper()} {data['server']}:{data['server_port']}"; self.added_proxies.append(AddedProxy(ptype=ptype, label=label, data=data)); proxy_added = True
         else: self.show_dialog("Error", f"Cannot add '{ptype}' from form. Please use the paste buttons."); return
-        if proxy_added:
+        if proxy_added: 
             self.log_message(f"Added proxy from form: {label}")
             self.refresh_added_list(); self.show_dialog("Added", f"'{label}' added to list.")
             self.clear_form_inputs()
@@ -584,7 +579,7 @@ class MainScreen(MDScreen):
         self.proxies_list_container.clear_widgets()
         for p in self.added_proxies: self.proxies_list_container.add_widget(ProxyDetailWidget(proxy_obj=p))
         MDApp.get_running_app().save_state()
-
+        
     def confirm_delete_proxy(self, proxy_to_remove):
         self.show_dialog_with_content(
             "Delete Proxy?",
@@ -595,13 +590,13 @@ class MainScreen(MDScreen):
             ]
         )
 
-    def remove_proxy(self, proxy_to_remove: AddedProxy):
+    def remove_proxy(self, proxy_to_remove: AddedProxy): 
         self.dialog.dismiss()
         self.log_message(f"Removed proxy: {proxy_to_remove.label}")
         self.added_proxies.remove(proxy_to_remove); self.refresh_added_list()
 
     def check_proxy(self, proxy: AddedProxy):
-        proxy.status = "Checking..."; proxy.latency = "..."; proxy.info = "...";
+        proxy.status = "Checking..."; proxy.latency = "..."; proxy.info = "..."; 
         if proxy.ui_widget:
             Clock.schedule_once(lambda dt: proxy.ui_widget.update_ui())
         threading.Thread(target=self._worker_check_proxy, args=(proxy,), daemon=True).start()
@@ -611,7 +606,7 @@ class MainScreen(MDScreen):
         ptype = proxy.ptype.lower()
         d = proxy.data
         host, port, user, pw = None, None, None, None
-
+        
         Clock.schedule_once(lambda dt: app.root.log_message(f"Checking proxy: {proxy.label} ({proxy.ptype})"))
 
         try:
@@ -629,7 +624,7 @@ class MainScreen(MDScreen):
             if ptype == 'wireguard':
                 if not DEPENDENCIES_AVAILABLE:
                     raise Exception("requests module needed for WG check")
-
+                
                 Clock.schedule_once(lambda dt: app.root.log_message(f"-> Resolving endpoint {host} for WireGuard..."))
                 try:
                     start_time = time.time()
@@ -639,7 +634,7 @@ class MainScreen(MDScreen):
                     proxy.latency = f"{latency_ms:.0f}ms (Resolve)"
                     proxy.info = f"Endpoint IP: {resolved_ip}"
                     Clock.schedule_once(lambda dt: app.root.log_message(f"-> Success for {proxy.label}. Endpoint resolved."))
-
+                    
                     Clock.schedule_once(lambda dt: app.root.log_message(f"-> Performing Geo-IP lookup for WireGuard IP {resolved_ip}..."))
                     try:
                         response = requests.get(f"https://ip-api.com/json/{resolved_ip}?fields=status,message,country,regionName", timeout=10)
@@ -653,14 +648,14 @@ class MainScreen(MDScreen):
 
                 except socket.gaierror:
                     raise Exception("Host Not Found")
-
+            
             elif ptype in ('socks5', 'http') and DEPENDENCIES_AVAILABLE:
                 Clock.schedule_once(lambda dt: app.root.log_message(f"-> Performing Geo-IP check for {host}:{port}..."))
                 proxy_url = f"{'socks5h' if ptype == 'socks5' else 'http'}://"
                 if user and pw: proxy_url += f"{user}:{pw}@"
                 proxy_url += f"{host}:{port}"
                 proxies = {"http": proxy_url, "https": proxy_url}
-
+                
                 try:
                     start_time = time.time()
                     api_url = "https://ip-api.com/json/?fields=status,message,country,regionName,query"
@@ -679,7 +674,7 @@ class MainScreen(MDScreen):
                     response.raise_for_status()
                     api_data = response.json()
                     proxy.info = f"{api_data.get('country', 'N/A')}, {api_data.get('region', 'N/A')} - {api_data.get('ip', 'N/A')}"
-
+                
                 proxy.status = "Reachable"
                 proxy.latency = f"{latency_ms:.0f}ms"
                 Clock.schedule_once(lambda dt: app.root.log_message(f"-> Geo-IP Success for {proxy.label}: {proxy.info}"))
@@ -702,19 +697,97 @@ class MainScreen(MDScreen):
 
         if proxy.ui_widget:
             Clock.schedule_once(lambda dt: proxy.ui_widget.update_ui())
-
+            
     def generate_config(self, instance=None):
-        outbounds = [{"type": "direct", "tag": "direct"}, {"type": "dns", "tag": "dns-out"}]; proxy_tags = []; final_outbound_tag = "direct"; selected_proxies = [p for p in self.added_proxies if p.selected]
+        # [MODIFIED] Start with a cleaner outbound list
+        outbounds = [{"type": "direct", "tag": "direct"}]
+        proxy_tags = []
+        final_route_tag = "direct"
+        dns_detour_tag = "direct"
+        selected_proxies = [p for p in self.added_proxies if p.selected]
+
         if selected_proxies:
             for p in selected_proxies:
                 ob = _outbound_from_added(outbound_tag_for_type, p)
-                if ob: outbounds.append(ob); proxy_tags.append(ob["tag"])
-            if proxy_tags: selector = {"type": "selector", "tag": "PROXY-SELECTOR", "outbounds": proxy_tags + ["direct"], "default": proxy_tags[0]}; outbounds.append(selector); final_outbound_tag = "PROXY-SELECTOR"
+                if ob:
+                    # Sanitize the tag to be simpler, like in the example
+                    ob['tag'] = ob['tag'].split('-')[0]
+                    # Ensure tags are unique if servers have same name
+                    if ob['tag'] in [o['tag'] for o in outbounds]:
+                        ob['tag'] = f"{ob['tag']}_{p.data.get('server_port')}"
+                    outbounds.append(ob)
+                    proxy_tags.append(ob["tag"])
+            
+            if proxy_tags:
+                # [MODIFIED] Create a selector named "PROXY" as per the working example
+                proxy_selector = {
+                    "type": "selector",
+                    "tag": "PROXY",
+                    "outbounds": proxy_tags + ["direct"],
+                    "default": proxy_tags[0]
+                }
+                outbounds.append(proxy_selector)
+
+                # [ADDED] Create a separate dns-out selector, as per the working example
+                dns_selector = {
+                    "type": "selector",
+                    "tag": "dns-out",
+                    "outbounds": proxy_tags + ["direct"],
+                    "default": proxy_tags[0]
+                }
+                outbounds.append(dns_selector)
+
+                final_route_tag = "PROXY"
+                dns_detour_tag = "dns-out" # Use the dedicated DNS selector
+            
             self.show_dialog("Generated", f"Config created with {len(proxy_tags)} proxies.")
             self.log_message(f"Generated config with {len(proxy_tags)} proxies.")
-        else: self.show_dialog("Generated", "Direct-only config generated.")
-        dns_detour = final_outbound_tag if self.dns_protection_on else "dns-out"
-        config_template = {"log": {"level": "error"}, "dns": {"servers": [{"tag": "cloudflare", "address": "https://1.1.1.1/dns-query", "detour": dns_detour}], "strategy": "prefer_ipv4"}, "inbounds": [{"type": "tproxy", "tag": "tproxy-in", "listen": "::", "listen_port": 9898, "sniff": True}], "outbounds": outbounds, "route": {"rules": [{"protocol": "dns", "outbound": "dns-out"}], "final": final_outbound_tag}, "experimental": {"clash_api": {"external_controller": "0.0.0.0:9090"}}}
+        else:
+            self.show_dialog("Generated", "Direct-only config generated.")
+
+        # [MODIFIED] Build the config template to match the working example's structure
+        config_template = {
+            "log": {"level": "error"},
+            "dns": {
+                "servers": [
+                    {
+                        "address": "https://1.1.1.1/dns-query",
+                        "detour": dns_detour_tag
+                    }
+                ]
+            },
+            "inbounds": [
+                {
+                    "type": "tproxy",
+                    "tag": "tproxy-in",
+                    "listen": "::",
+                    "listen_port": 9898,
+                    "sniff": True
+                },
+                # [ADDED] Include the redirect inbound block for better compatibility
+                {
+                    "type": "redirect",
+                    "tag": "redirect-in",
+                    "listen": "::",
+                    "listen_port": 9797,
+                    "sniff": True,
+                    "sniff_override_destination": False
+                }
+            ],
+            "outbounds": outbounds,
+            "route": {
+                # [MODIFIED] Use the correct final tag and add auto_detect_interface
+                "final": final_route_tag,
+                "auto_detect_interface": False
+            },
+            "experimental": {
+                "clash_api": {
+                    "external_controller": "0.0.0.0:9090",
+                    # [ADDED] The crucial line for the dashboard to work
+                    "external_ui": "dashboard"
+                }
+            }
+        }
         self.generated_config = json.dumps(config_template, indent=2)
 
     def view_config(self, instance):
@@ -750,7 +823,7 @@ class MainScreen(MDScreen):
     def edit_proxy(self, proxy: AddedProxy):
         content = MDTextField(text=proxy.raw if proxy.raw else json.dumps(proxy.data, indent=2), multiline=True)
         self.show_dialog_with_content(f"Edit {proxy.label}", content, [MDFlatButton(text="CANCEL", on_release=lambda x: self.dialog.dismiss()), MDFlatButton(text="SAVE", on_release=lambda x: self.save_proxy_edit(proxy, content.text))])
-
+    
     def save_proxy_edit(self, proxy, text):
         self.dialog.dismiss()
         ptype = proxy.ptype.lower()
@@ -762,11 +835,11 @@ class MainScreen(MDScreen):
                 if ptype == "vmess": decoded = _decode_vmess(proxy.raw)
                 elif ptype == "vless": decoded = _decode_vless(proxy.raw)
                 elif ptype == "shadowsocks": decoded = _decode_shadowsocks(proxy.raw)
-                if decoded.get('server'):
+                if decoded.get('server'): 
                     proxy.label = f"{ptype.upper()} {decoded.get('server')}"
             else: # For form-based proxies
                 proxy.data = json.loads(text)
-                if proxy.data.get('server'):
+                if proxy.data.get('server'): 
                     proxy.label = f"{ptype.upper()} {proxy.data.get('server')}"
             self.log_message(f"Edited proxy '{original_label}' to '{proxy.label}'.")
             self.refresh_added_list()
@@ -812,9 +885,9 @@ class SingboxApp(MDApp):
         proxies_data = []
         for p in main_screen.added_proxies:
             p_dict = p.__dict__.copy()
-            p_dict.pop('_ui_widget_ref', None)
+            p_dict.pop('_ui_widget_ref', None) 
             proxies_data.append(p_dict)
-
+        
         self.store.put('settings',
             theme_style=self.theme_cls.theme_style,
             dns_on=main_screen.dns_protection_on,
