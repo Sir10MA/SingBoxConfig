@@ -32,7 +32,8 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y build-essential git zip unzip openjdk-17-jdk python3-pip python3-setuptools python3-dev libffi-dev libssl-dev libsqlite3-dev zlib1g-dev libjpeg-dev libfreetype6-dev liblcms2-dev pkg-config autoconf automake libtool cmake
         pip install --upgrade pip
-        pip install cython==0.29.36
+        # --- FIX: Removed pinned Cython version to ensure compatibility ---
+        pip install cython
 
     # 4️⃣ Build APK (universal)
     - name: Build APK
@@ -53,12 +54,19 @@ jobs:
     # 7️⃣ Upload APK to GitHub Release
     - name: Upload APK to GitHub Release
       run: |
+        # --- FIX: Use a wildcard to find the generated APK regardless of its exact name ---
+        APK_FILE=$(find bin -name "*.apk" | head -n 1)
+        if [ -z "$APK_FILE" ]; then
+          echo "APK file not found!"
+          exit 1
+        fi
+        
         if gh release view v${VERSION} &>/dev/null; then
           echo "Release exists, uploading APK..."
-          gh release upload v${VERSION} bin/*.apk --clobber
+          gh release upload v${VERSION} "$APK_FILE" --clobber
         else
           echo "Creating new release..."
-          gh release create v${VERSION} bin/*.apk --title "Sing-Box Configurator v${VERSION}" --notes "Universal APK build (armeabi-v7a + arm64-v8a)"
+          gh release create v${VERSION} "$APK_FILE" --title "Sing-Box Configurator v${VERSION}" --notes "Universal APK build."
         fi
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
