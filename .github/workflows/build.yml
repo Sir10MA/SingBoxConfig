@@ -1,4 +1,4 @@
-    name: Build and Release APK
+name: Build and Release APK
 
 on:
   push:
@@ -38,3 +38,4 @@ jobs:
           files: bin/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
