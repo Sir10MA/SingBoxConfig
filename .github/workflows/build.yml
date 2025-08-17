@@ -1,29 +1,40 @@
-    Running command git checkout -q 1.4.2
-    error: pathspec '1.4.2' did not match any file(s) known to git
-    error: subprocess-exited-with-error
-    
-    × git checkout -q 1.4.2 did not run successfully.
-    │ exit code: 1
-    ╰─> See above for output.
-    
-    note: This error originates from a subprocess, and is likely not a problem with pip.
-  
-  Notice:  A new release of pip is available: 25.1.1 -> 25.2
-  Notice:  To update, run: python3 -m pip install --upgrade pip
-  error: subprocess-exited-with-error
-  
-  × git checkout -q 1.4.2 did not run successfully.
-  │ exit code: 1
-  ╰─> See above for output.
-  
-  note: This error originates from a subprocess, and is likely not a problem with pip.
-  Traceback (most recent call last):
-    File "/action/entrypoint.py", line 167, in <module>
-      main()
-    File "/action/entrypoint.py", line 23, in main
-      install_buildozer(env["INPUT_BUILDOZER_VERSION"])
-    File "/action/entrypoint.py", line 66, in install_buildozer
-      subprocess.check_call(
-    File "/usr/lib/python3.10/subprocess.py", line 369, in check_call
-      raise CalledProcessError(retcode, cmd)
-  subprocess.CalledProcessError: Command '['/bin/python3', '-m', 'pip', 'install', '--user', '--upgrade', 'git+https://github.com/kivy/buildozer.git@1.4.2']' returned non-zero exit status 1.
+    name: Build and Release APK
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Build APK with Buildozer
+      - name: Build APK
+        uses: ArtemSBulgakov/buildozer-action@v1
+        with:
+          workdir: .
+          command: android debug
+          buildozer_version: "1.4.1"
+
+      # 3. Read version from buildozer.spec
+      - name: Get version from buildozer.spec
+        id: get_version
+        run: |
+          version=$(grep '^version =' buildozer.spec | awk -F= '{print $2}' | tr -d ' ')
+          echo "VERSION=$version" >> $GITHUB_ENV
+
+      # 4. Create or update GitHub Release and upload APK
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ env.VERSION }}
+          name: Sing-Box Configurator v${{ env.VERSION }}
+          files: bin/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
