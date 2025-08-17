@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout repo
+      # 1. Checkout the repo
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -21,62 +21,22 @@ jobs:
           python-version: '3.9'
 
       # 3. Install system dependencies
-      - name: Install system dependencies
+      - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            build-essential \
-            git \
-            zip \
-            unzip \
-            openjdk-17-jdk \
-            python3-pip \
-            python3-setuptools \
-            python3-dev \
-            libffi-dev \
-            libssl-dev \
-            libsqlite3-dev \
-            zlib1g-dev \
-            libjpeg-dev \
-            libfreetype6-dev \
-            liblcms2-dev \
-            pkg-config \
-            autoconf \
-            automake \
-            libtool \
-            cmake
+          sudo apt-get install -y build-essential git zip unzip openjdk-17-jdk python3-pip python3-setuptools python3-dev libffi-dev libssl-dev libsqlite3-dev zlib1g-dev libjpeg-dev libfreetype6-dev liblcms2-dev pkg-config autoconf automake libtool cmake
           pip install --upgrade pip
-          pip install buildozer cython==0.29.36
+          pip install cython==0.29.36
 
-      # 4. Install Android SDK/NDK
-      - name: Install Android SDK & NDK
-        run: |
-          mkdir -p $HOME/.buildozer/android/platform/android-sdk/cmdline-tools
-          mkdir -p $HOME/.buildozer/android/platform/android-ndk
-
-          cd $HOME/.buildozer/android/platform
-
-          wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
-          unzip -q cmdline-tools.zip -d android-sdk/cmdline-tools
-          mv android-sdk/cmdline-tools/cmdline-tools android-sdk/cmdline-tools/latest
-
-          yes | android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses
-          yes | android-sdk/cmdline-tools/latest/bin/sdkmanager \
-            "platforms;android-34" \
-            "build-tools;34.0.0" \
-            "platform-tools"
-
-          # Export environment variables so Buildozer uses the new paths
-          echo "ANDROIDSDK=$HOME/.buildozer/android/platform/android-sdk" >> $GITHUB_ENV
-          echo "ANDROIDNDK=$HOME/.buildozer/android/platform/android-ndk" >> $GITHUB_ENV
-          echo "PATH=$HOME/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin:$HOME/.buildozer/android/platform/android-sdk/platform-tools:$HOME/.buildozer/android/platform/android-sdk/build-tools/34.0.0:$PATH" >> $GITHUB_ENV
-
-      # 5. Build APK with Buildozer
+      # 4. Build APK using ArtemSBulgakov/buildozer-action
       - name: Build APK
-        run: |
-          buildozer -v android debug
+        uses: ArtemSBulgakov/buildozer-action@v1
+        with:
+          workdir: .
+          build_command: buildozer -v android debug
+          python_version: '3.9'
 
-      # 6. Upload APK as artifact
+      # 5. Upload APK artifact
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
