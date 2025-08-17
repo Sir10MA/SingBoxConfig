@@ -9,7 +9,7 @@ source.dir = .
 source.include_exts = py,json,kv,png,jpg,atlas
 
 # Version
-version = 4.3
+version = 1.0.0
 
 # Dependencies
 requirements = python3,kivy==2.3.1,kivymd==1.2.0,requests,pyyaml
