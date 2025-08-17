@@ -2,8 +2,7 @@
 """
 Sing-box Config Maker - KivyMD Edition (Final Patched Version)
 
-- [UI FIX] Removed the "OLED" theme option to resolve the AttributeError crash on older KivyMD versions.
-- [STABILITY] All other features, including the Maroon theme, robust proxy checker, and navigation fixes, are retained.
+
 """
 
 import os
@@ -213,7 +212,8 @@ class ProxyDetailWidget(MDCard):
         self.proxy.ui_widget = self
         self.orientation = 'vertical'
         self.size_hint_y = None
-        self.height = "140dp"
+        # [MODIFIED] Card height is now adaptive to prevent text truncation
+        self.adaptive_height = True
         self.padding = "8dp"
         self.elevation = 3
         self.style = "filled"
@@ -245,7 +245,8 @@ class ProxyDetailWidget(MDCard):
         self.lbl_latency = MDLabel(font_style="Caption", adaptive_height=True)
         
         status_grid.add_widget(MDLabel(text="Info:", font_style="Caption", bold=True, adaptive_height=True))
-        self.lbl_info = MDLabel(font_style="Caption", adaptive_height=True, shorten=True, shorten_from='left')
+        # [MODIFIED] Removed shorten=True to allow full Geo-IP info to be displayed
+        self.lbl_info = MDLabel(font_style="Caption", adaptive_height=True)
 
         status_grid.add_widget(self.lbl_status)
         status_grid.add_widget(self.lbl_latency)
@@ -282,7 +283,8 @@ class MainScreen(MDScreen):
         self.log_file_path = None
         root_layout = MDBoxLayout(orientation='vertical', spacing='10dp')
         header = MDBoxLayout(adaptive_height=True, spacing="10dp", padding=("10dp", "10dp", "10dp", 0))
-        header.add_widget(MDLabel(text="Sing-Box Configurator", font_style="H6", adaptive_height=True))
+        # [MODIFIED] App name changed in the header
+        header.add_widget(MDLabel(text="BoxConfig", font_style="H6", adaptive_height=True))
         root_layout.add_widget(header)
         self.tab_panel = MDTabs(background_color=self.theme_cls.primary_color)
         self.tab_panel.bind(on_tab_switch=self.on_tab_switch)
@@ -395,7 +397,13 @@ class MainScreen(MDScreen):
     def open_theme_menu(self, instance):
         themes = ["Light", "Dark", "Maroon"]
         menu_items = [{"text": theme, "viewclass": "OneLineListItem", "on_release": lambda x=theme: self.change_theme(x)} for theme in themes]
-        MDDropdownMenu(caller=instance, items=menu_items, width_mult=4).open()
+        # [MODIFIED] Set max_height on dropdown to prevent it being cut off
+        MDDropdownMenu(
+            caller=instance,
+            items=menu_items,
+            width_mult=4,
+            max_height=Window.height * 0.5
+        ).open()
 
     def change_theme(self, theme_style):
         app = MDApp.get_running_app()
@@ -699,7 +707,6 @@ class MainScreen(MDScreen):
             Clock.schedule_once(lambda dt: proxy.ui_widget.update_ui())
             
     def generate_config(self, instance=None):
-        # [MODIFIED] Start with a cleaner outbound list
         outbounds = [{"type": "direct", "tag": "direct"}]
         proxy_tags = []
         final_route_tag = "direct"
@@ -710,16 +717,13 @@ class MainScreen(MDScreen):
             for p in selected_proxies:
                 ob = _outbound_from_added(outbound_tag_for_type, p)
                 if ob:
-                    # Sanitize the tag to be simpler, like in the example
                     ob['tag'] = ob['tag'].split('-')[0]
-                    # Ensure tags are unique if servers have same name
                     if ob['tag'] in [o['tag'] for o in outbounds]:
                         ob['tag'] = f"{ob['tag']}_{p.data.get('server_port')}"
                     outbounds.append(ob)
                     proxy_tags.append(ob["tag"])
             
             if proxy_tags:
-                # [MODIFIED] Create a selector named "PROXY" as per the working example
                 proxy_selector = {
                     "type": "selector",
                     "tag": "PROXY",
@@ -728,7 +732,6 @@ class MainScreen(MDScreen):
                 }
                 outbounds.append(proxy_selector)
 
-                # [ADDED] Create a separate dns-out selector, as per the working example
                 dns_selector = {
                     "type": "selector",
                     "tag": "dns-out",
@@ -738,14 +741,13 @@ class MainScreen(MDScreen):
                 outbounds.append(dns_selector)
 
                 final_route_tag = "PROXY"
-                dns_detour_tag = "dns-out" # Use the dedicated DNS selector
+                dns_detour_tag = "dns-out"
             
             self.show_dialog("Generated", f"Config created with {len(proxy_tags)} proxies.")
             self.log_message(f"Generated config with {len(proxy_tags)} proxies.")
         else:
             self.show_dialog("Generated", "Direct-only config generated.")
 
-        # [MODIFIED] Build the config template to match the working example's structure
         config_template = {
             "log": {"level": "error"},
             "dns": {
@@ -764,7 +766,6 @@ class MainScreen(MDScreen):
                     "listen_port": 9898,
                     "sniff": True
                 },
-                # [ADDED] Include the redirect inbound block for better compatibility
                 {
                     "type": "redirect",
                     "tag": "redirect-in",
@@ -776,14 +777,12 @@ class MainScreen(MDScreen):
             ],
             "outbounds": outbounds,
             "route": {
-                # [MODIFIED] Use the correct final tag and add auto_detect_interface
                 "final": final_route_tag,
                 "auto_detect_interface": False
             },
             "experimental": {
                 "clash_api": {
                     "external_controller": "0.0.0.0:9090",
-                    # [ADDED] The crucial line for the dashboard to work
                     "external_ui": "dashboard"
                 }
             }
@@ -849,7 +848,8 @@ class MainScreen(MDScreen):
 
 class SingboxApp(MDApp):
     def build(self):
-        self.title = "Sing-box Config Maker"; self.theme_cls.primary_palette = "BlueGray"; self.theme_cls.accent_palette = "Amber"; self.theme_cls.theme_style = "Dark"
+        # [MODIFIED] App title changed
+        self.title = "BoxConfig"; self.theme_cls.primary_palette = "BlueGray"; self.theme_cls.accent_palette = "Amber"; self.theme_cls.theme_style = "Dark"
         self.store = JsonStore(os.path.join(self.user_data_dir, 'settings.json'))
         Window.bind(on_request_close=self.handle_back_button)
         return MainScreen()
