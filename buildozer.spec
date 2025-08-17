@@ -1,7 +1,7 @@
 [app]
 
 # (str) Title of your application
-title = Sing-Box Configurator
+title = BoxConFig
 
 # (str) Package name
 package.name = singboxconfig
