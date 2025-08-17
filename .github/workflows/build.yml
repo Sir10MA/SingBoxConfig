@@ -21,7 +21,7 @@ jobs:
           python-version: '3.9'
 
       # 3. Install dependencies
-      - name: Install dependencies
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -51,28 +51,41 @@ jobs:
       # 4. Install Android SDK + build-tools
       - name: Install Android SDK tools
         run: |
-          mkdir -p $HOME/.buildozer/android/platform
+          # Create directories
+          mkdir -p $HOME/.buildozer/android/platform/android-sdk/cmdline-tools
+          mkdir -p $HOME/.buildozer/android/platform/android-ndk
+
           cd $HOME/.buildozer/android/platform
+
+          # Download command line tools
           wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
           unzip -q cmdline-tools.zip -d android-sdk/cmdline-tools
           mv android-sdk/cmdline-tools/cmdline-tools android-sdk/cmdline-tools/latest
-          yes | android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses
-          yes | android-sdk/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
 
-          # Set env variables so Buildozer finds the new sdkmanager
+          # Accept licenses
+          yes | android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses
+
+          # Install platform & build-tools
+          yes | android-sdk/cmdline-tools/latest/bin/sdkmanager \
+            "platforms;android-34" \
+            "build-tools;34.0.0" \
+            "platform-tools"
+
+          # Export env variables so Buildozer uses correct paths
           echo "ANDROIDSDK=$HOME/.buildozer/android/platform/android-sdk" >> $GITHUB_ENV
           echo "ANDROIDNDK=$HOME/.buildozer/android/platform/android-ndk" >> $GITHUB_ENV
           echo "PATH=$HOME/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin:$HOME/.buildozer/android/platform/android-sdk/platform-tools:$HOME/.buildozer/android/platform/android-sdk/build-tools/34.0.0:$PATH" >> $GITHUB_ENV
 
       # 5. Build APK
-      - name: Build with Buildozer
+      - name: Build APK
         env:
           ANDROIDSDK: ${{ env.ANDROIDSDK }}
           ANDROIDNDK: ${{ env.ANDROIDNDK }}
-        run: buildozer -v android debug
+        run: |
+          buildozer -v android debug
 
-      # 6. Upload Artifact
-      - name: Upload Artifact
+      # 6. Upload APK artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: singboxconfig-apk
