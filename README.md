@@ -19,8 +19,6 @@ It provides a simple UI for creating configs without manually editing JSON, whil
 - 🪵 Crash-safe logging system (`singbox_log.txt` stored in app storage)  
 - ⚡ **Proxy check & connectivity test** before saving configs  
 
-## 📸 Screenshots
-*(Add screenshots here when ready)*  
 
 ## 🚀 Installation
 
