@@ -1,8 +1,33 @@
 # sing_config_maker.py
 """
 Sing-Box Configurator - v4.3 (Crash Fix Release)
-
 """
+
+# --- Logging Setup ---
+import sys
+import os
+import traceback
+
+# Path where logs will be written (external storage)
+LOG_FILE = "/sdcard/singbox_log.txt"
+
+# Ensure the directory exists
+try:
+    os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+except Exception:
+    pass
+
+# Redirect stdout and stderr to the log file
+sys.stdout = open(LOG_FILE, "w", buffering=1)   # line-buffered
+sys.stderr = sys.stdout
+
+# Optional: catch uncaught exceptions and write them
+def excepthook(exc_type, exc_value, exc_traceback):
+    traceback.print_exception(exc_type, exc_value, exc_traceback, file=sys.stderr)
+
+sys.excepthook = excepthook
+
+print("🔹 Logging started. Any errors will be written here:", LOG_FILE)
 
 # --- Standard Library Imports ---
 import os
@@ -15,7 +40,6 @@ import webbrowser
 import subprocess
 from dataclasses import dataclass, asdict
 from urllib.parse import urlparse, parse_qs, unquote
-
 # --- Third-party Library Imports ---
 import requests
 try:
