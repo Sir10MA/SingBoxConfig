@@ -48,7 +48,7 @@ jobs:
           pip install --upgrade pip
           pip install buildozer cython==0.29.36
 
-      # 4. Install Android SDK + build-tools, fix AIDL issue
+      # 4. Install Android SDK + build-tools
       - name: Install Android SDK tools
         run: |
           mkdir -p $HOME/.buildozer/android/platform
@@ -60,13 +60,18 @@ jobs:
           yes | android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses
           yes | android-sdk/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0"
 
-          # Add AIDL + SDK tools to PATH
+          # Add SDK paths
+          echo "ANDROIDSDK=$HOME/.buildozer/android/platform/android-sdk" >> $GITHUB_ENV
+          echo "ANDROIDNDK=$HOME/.buildozer/android/platform/android-ndk" >> $GITHUB_ENV
           echo "$HOME/.buildozer/android/platform/android-sdk/build-tools/34.0.0" >> $GITHUB_PATH
           echo "$HOME/.buildozer/android/platform/android-sdk/platform-tools" >> $GITHUB_PATH
           echo "$HOME/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
 
-      # 5. Build APK
+      # 5. Build APK (with SDK paths set)
       - name: Build with Buildozer
+        env:
+          ANDROIDSDK: ${{ env.ANDROIDSDK }}
+          ANDROIDNDK: ${{ env.ANDROIDNDK }}
         run: buildozer -v android debug
 
       # 6. Upload Artifact
