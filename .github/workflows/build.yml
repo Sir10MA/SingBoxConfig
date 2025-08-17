@@ -1,54 +1,67 @@
 name: Build and Release APK
 
+# Trigger on push to main or manually
 on:
   push:
     branches: [ "main" ]
   workflow_dispatch:
 
+# Allow write access to repo contents
+permissions:
+  contents: write
+
+env:
+  VERSION: 4.3  # Set your app version here
+
 jobs:
-  build-apk:
+  build-and-release:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout the repo
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    # 1️⃣ Checkout repository
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      # 2. Set up Python
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.9'
+    # 2️⃣ Set up Python
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.9'
 
-      # 3. Install system dependencies
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential git zip unzip openjdk-17-jdk python3-pip python3-setuptools python3-dev libffi-dev libssl-dev libsqlite3-dev zlib1g-dev libjpeg-dev libfreetype6-dev liblcms2-dev pkg-config autoconf automake libtool cmake
-          pip install --upgrade pip
-          pip install cython==0.29.36
+    # 3️⃣ Install system dependencies
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential git zip unzip openjdk-17-jdk python3-pip python3-setuptools python3-dev libffi-dev libssl-dev libsqlite3-dev zlib1g-dev libjpeg-dev libfreetype6-dev liblcms2-dev pkg-config autoconf automake libtool cmake
+        pip install --upgrade pip
+        pip install cython==0.29.36
 
-      # 4. Build APK using ArtemSBulgakov/buildozer-action
-      - name: Build APK
-        uses: ArtemSBulgakov/buildozer-action@v1
-        with:
-          workdir: .
-          build_command: buildozer -v android debug
-          python_version: '3.9'
+    # 4️⃣ Build APK using Buildozer
+    - name: Build APK
+      uses: ArtemSBulgakov/buildozer-action@v1
+      with:
+        workdir: .
+        build_command: buildozer -v android debug
+        python_version: '3.9'
 
-      # 5. Read version from buildozer.spec
-      - name: Get version from buildozer.spec
-        id: get_version
-        run: |
-          version=$(grep '^version =' buildozer.spec | awk -F= '{print $2}' | tr -d ' ')
-          echo "VERSION=$version" >> $GITHUB_ENV
+    # 5️⃣ Install GitHub CLI for release
+    - name: Install GitHub CLI
+      run: sudo apt-get install -y gh
 
-      # 6. Create or update GitHub Release and upload APK
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: v${{ env.VERSION }}
-          name: Sing-Box Configurator v${{ env.VERSION }}
-          files: bin/*.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    # 6️⃣ Authenticate GitHub CLI
+    - name: Authenticate gh
+      run: gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
+
+    # 7️⃣ Upload APK to GitHub release
+    - name: Upload APK to GitHub Release
+      run: |
+        # Check if release exists
+        if gh release view v${VERSION} &>/dev/null; then
+          echo "Release exists, uploading APK..."
+          gh release upload v${VERSION} bin/*.apk --clobber
+        else
+          echo "Creating new release..."
+          gh release create v${VERSION} bin/*.apk --title "Sing-Box Configurator v${VERSION}" --notes "Automated APK release"
+        fi
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
