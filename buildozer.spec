@@ -6,13 +6,14 @@ package.domain = com.sirtenmaa
 
 # Entrypoint
 source.dir = .
+source.main = main.py
 source.include_exts = py,json,kv,png,jpg,atlas
 
 # Version
 version = 1.0.0
 
 # Dependencies
-requirements = python3,kivy==2.3.1,kivymd==1.2.0,requests,pyyaml
+requirements = python3,kivy==2.3.1,https://github.com/kivymd/KivyMD/archive/refs/heads/master.zip,requests,pyyaml
 
 # Permissions
 android.permissions = INTERNET, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE
@@ -20,18 +21,14 @@ android.permissions = INTERNET, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE
 # Orientation
 orientation = portrait
 
-# Architecture
-android.archs = arm64-v8a
+# Architecture (universal build)
+android.archs = arm64-v8a,armeabi-v7a
 
 # Android API / SDK / NDK
-android.api = 27
+android.api = 34
 android.sdk = 34
 android.ndk = 25b
 android.build_tools = 34.0.0
-
-# Optional splash & icon
-# presplash.filename = %(source.dir)s/data/presplash.png
-# icon.filename = %(source.dir)s/data/icon.png
 
 [buildozer]
 log_level = 2
