@@ -1,4 +1,4 @@
-name: Build and Release Universal APK
+name: Build and Release APK
 
 on:
   push:
@@ -8,19 +8,25 @@ on:
 permissions:
   contents: write
 
+env:
+  VERSION: 1.0.0  # Hardcoded app version
+
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
 
     steps:
+    # 1️⃣ Checkout repository
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    # 2️⃣ Set up Python
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.9'
 
+    # 3️⃣ Install system dependencies
     - name: Install dependencies
       run: |
         sudo apt-get update
@@ -28,12 +34,7 @@ jobs:
         pip install --upgrade pip
         pip install cython==0.29.36
 
-    - name: Read version from buildozer.spec
-      id: get_version
-      run: |
-        VERSION=$(grep '^version =' buildozer.spec | cut -d'=' -f2 | tr -d ' ')
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
-
+    # 4️⃣ Build APK (universal)
     - name: Build APK
       uses: ArtemSBulgakov/buildozer-action@v1
       with:
@@ -41,26 +42,23 @@ jobs:
         build_command: buildozer -v android debug
         python_version: '3.9'
 
-    - name: Rename Universal APK
-      run: |
-        mkdir -p release-apks
-        cp bin/*.apk release-apks/singboxconfig-${{ steps.get_version.outputs.version }}-universal.apk
-
+    # 5️⃣ Install GitHub CLI
     - name: Install GitHub CLI
       run: sudo apt-get install -y gh
 
+    # 6️⃣ Authenticate GitHub CLI
     - name: Authenticate gh
       run: gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
 
+    # 7️⃣ Upload APK to GitHub Release
     - name: Upload APK to GitHub Release
       run: |
-        if gh release view v${{ steps.get_version.outputs.version }} &>/dev/null; then
+        if gh release view v${VERSION} &>/dev/null; then
           echo "Release exists, uploading APK..."
-          gh release upload v${{ steps.get_version.outputs.version }} release-apks/*.apk --clobber
+          gh release upload v${VERSION} bin/*.apk --clobber
         else
           echo "Creating new release..."
-          gh release create v${{ steps.get_version.outputs.version }} release-apks/*.apk --title "Sing-Box Configurator v${{ steps.get_version.outputs.version }}" --notes "Universal APK build (arm64-v8a + armeabi-v7a)"
+          gh release create v${VERSION} bin/*.apk --title "Sing-Box Configurator v${VERSION}" --notes "Universal APK build (armeabi-v7a + arm64-v8a)"
         fi
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
- 
