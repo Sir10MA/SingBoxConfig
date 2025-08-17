@@ -6,7 +6,6 @@ package.domain = com.sirtenmaa
 
 # Entrypoint
 source.dir = .
-# Your updated main file
 source.main = sing_config_maker.py
 source.include_exts = py,json,kv,png,jpg,atlas
 
@@ -17,8 +16,8 @@ version = 4.3
 requirements = python3,kivy==2.2.1,kivymd==1.1.1,requests,pyyaml
 
 # Permissions
-# Added MANAGE_EXTERNAL_STORAGE so your app can actually write logs to /sdcard
-android.permissions = INTERNET,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE,MANAGE_EXTERNAL_STORAGE
+# Play Store–friendly: no MANAGE_EXTERNAL_STORAGE
+android.permissions = INTERNET,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE
 
 # Orientation
 orientation = portrait
@@ -31,7 +30,9 @@ android.api = 34
 android.sdk = 34
 android.ndk = 25b
 android.build_tools = 34.0.0
-android.minapi = 23   # Android 6.0+
+
+# Minimum supported Android (Android 6.0)
+android.minapi = 23
 
 # Optional splash & icon
 # presplash.filename = %(source.dir)s/data/presplash.png
