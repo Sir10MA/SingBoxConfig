@@ -25,7 +25,7 @@ requirements = python3,kivy,kivymd,requests,pysocks,urllib3,idna,certifi,pyyaml
 version = 1.0
 
 # (list) Android permissions required by the app
-android.permissions = INTERNET, ACCESS_NETWORK_STATE
+android.permissions = INTERNET, ACCESS_NETWORK_STATE, WRITE_EXTERNAL_STORAGE, READ_EXTERNAL_STORAGE
 
 # (int) Target Android API level
 android.api = 31
