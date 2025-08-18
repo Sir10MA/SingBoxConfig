@@ -41,7 +41,8 @@ orientation = portrait
 
 # (Optional) If you have a presplash or icon image, uncomment and set:
 # presplash.filename = %(source.dir)s/presplash.png
-# icon.filename = %(source.dir)s/icon.png
+
+icon.filename = %(source.dir)s/icon.png
 
 
 [buildozer]
